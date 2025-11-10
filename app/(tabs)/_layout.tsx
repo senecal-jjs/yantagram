@@ -24,9 +24,10 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="dms"
+        name="chats"
         options={{
-          title: 'DMs',
+          title: 'Chats',
+          tabBarLabel: 'Chats',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="message" color={color} />,
         }}
       />
