@@ -46,11 +46,13 @@ enum PacketType {
 // including allowedHops for hop limiting and optional encryption.
 // Note: Packets larger than BLE MTU (512 bytes) are automatically fragmented
 type BitchatPacket = {
+    version: number,
     type: PacketType,
     senderId: string,
     recipientId: string,
-    timestamp: string,
-    payload: string,
+    timestamp: number,
+    payload: Uint8Array,
     signature: string?,
     allowedHops: number,
+    route: Uint8Array,
 }
