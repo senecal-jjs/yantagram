@@ -4,6 +4,8 @@ import { FlatList, Keyboard, KeyboardAvoidingView, Platform, StyleSheet, Text, T
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
 import { ChatBubble } from '@/components/chat-bubble';
+import { COLOR_CHARACTERISTIC_UUID, DATA_SERVICE_UUID } from '@/hooks/use-ble';
+import useMessaging from '@/hooks/use-messaging';
 
 const renderMessage = ({item}: { item: Message }) => {
   return <ChatBubble message={item} />
@@ -12,6 +14,7 @@ const renderMessage = ({item}: { item: Message }) => {
 export default function Chat() {
   const navigation = useNavigation()
   const { chatId } = useLocalSearchParams<{ chatId: string }>()
+  const { sendMessage } = useMessaging(DATA_SERVICE_UUID, COLOR_CHARACTERISTIC_UUID)
 
   useEffect(() => {
     navigation.setOptions({ 
@@ -45,8 +48,10 @@ export default function Chat() {
         contents: newMessage,
         isMine: false,
       }
+
       setMessages([...messages, newMsg])
       setNewMessage('')
+      sendMessage(newMsg)
 
       // scroll to the end of the list to show the new message
       flatListRef.current?.scrollToEnd({ animated: true })

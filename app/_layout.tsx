@@ -3,6 +3,7 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 
+import useBLE from '@/hooks/use-ble';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 export const unstable_settings = {
@@ -11,6 +12,23 @@ export const unstable_settings = {
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
+
+  const {
+    requestPermissions,
+    scanForPeripherals,
+    advertiseAsPeripheral,
+  } = useBLE();
+
+  const scanForDevices = async () => {
+    const isPermissionsEnabled = await requestPermissions()
+
+    if (isPermissionsEnabled) {
+      advertiseAsPeripheral()
+      scanForPeripherals()
+    }
+  }
+
+  scanForDevices()
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
