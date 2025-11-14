@@ -13,23 +13,6 @@ export const unstable_settings = {
 export default function RootLayout() {
   const colorScheme = useColorScheme();
 
-  // const {
-  //   requestPermissions,
-  //   scanForPeripherals,
-  //   advertiseAsPeripheral,
-  // } = useBLE();
-
-  // const scanForDevices = async () => {
-  //   const isPermissionsEnabled = await requestPermissions()
-
-  //   if (isPermissionsEnabled) {
-  //     advertiseAsPeripheral()
-  //     scanForPeripherals()
-  //   }
-  // }
-
-  // scanForDevices()
-
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <BluetoothProvider>
