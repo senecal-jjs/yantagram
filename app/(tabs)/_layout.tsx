@@ -12,15 +12,21 @@ export default function TabLayout() {
 
   const { scan, advertise, permissions } = useBluetooth();
 
-  const scanForDevices = async () => {
+  const advertiseNow = async () => {
     const isPermissionsEnabled = await permissions();
-
     if (isPermissionsEnabled) {
       advertise();
+    }
+  };
+
+  const scanForDevices = async () => {
+    const isPermissionsEnabled = await permissions();
+    if (isPermissionsEnabled) {
       scan();
     }
   };
 
+  advertiseNow();
   scanForDevices();
 
   return (

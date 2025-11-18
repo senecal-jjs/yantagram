@@ -24,6 +24,7 @@ export const BluetoothProvider: React.FC<{ children: React.ReactNode }> = ({
     scanForPeripherals,
     advertiseAsPeripheral,
     requestPermissions,
+    setupPeripheral,
   } = useBLE();
 
   const scan = async () => {
@@ -32,6 +33,7 @@ export const BluetoothProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const advertise = async () => {
     advertiseAsPeripheral();
+    // setupPeripheral();
   };
 
   const permissions = async (): Promise<boolean> => {

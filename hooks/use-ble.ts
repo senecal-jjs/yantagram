@@ -171,7 +171,7 @@ function useBLE() {
       const discovery =
         await deviceConnection.discoverAllServicesAndCharacteristics();
       setConnectedDevices([...connectedDevices, discovery]);
-      bleManager.stopDeviceScan();
+      // bleManager.stopDeviceScan();
       // startStreamingData(deviceConnection);
     } catch (e) {
       console.log("FAILED TO CONNECT", e);
@@ -181,21 +181,26 @@ function useBLE() {
   const isDuplicateDevice = (devices: Device[], nextDevice: Device) =>
     devices.findIndex((device) => nextDevice.id === device.id) > -1;
 
-  const scanForPeripherals = () =>
-    bleManager.startDeviceScan(null, null, (error, device) => {
+  const scanForPeripherals = async () =>
+    bleManager.startDeviceScan(null, null, async (error, device) => {
       if (error) {
         console.log(error);
       }
 
       // confirm the device is advertising the data service uuid
       if (device && device.serviceUUIDs?.includes(DATA_SERVICE_UUID)) {
-        setAllDevices((prevState: Device[]) => {
-          if (!isDuplicateDevice(prevState, device)) {
-            connectToDevice(device);
-            return [...prevState, device];
-          }
-          return prevState;
-        });
+        const isConnected = await device.isConnected();
+
+        if (!isConnected) {
+          connectToDevice(device);
+        }
+        // setAllDevices((prevState: Device[]) => {
+        //   if (!isDuplicateDevice(prevState, device)) {
+        //     connectToDevice(device);
+        //     return [...prevState, device];
+        //   }
+        //   return prevState;
+        // });
       }
     });
 
@@ -247,6 +252,7 @@ function useBLE() {
     startStreamingData,
     advertiseAsPeripheral,
     updateCharacteristic,
+    setupPeripheral,
   };
 }
 
