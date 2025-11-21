@@ -18,6 +18,7 @@ import { ChatBubble } from "@/components/chat-bubble";
 import { useRepos } from "@/components/repository-context";
 import { COLOR_CHARACTERISTIC_UUID, DATA_SERVICE_UUID } from "@/hooks/use-ble";
 import useMessaging from "@/hooks/use-ble-messaging";
+import BleModule from "@/modules/ble/src/BleModule";
 import { DeliveryStatus, Message } from "@/types/global";
 import { getRandomBytes } from "@/utils/random";
 import { secureFetch, secureStore } from "@/utils/secure-store";
@@ -30,7 +31,7 @@ export default function Chat() {
   const messagesRepo = getRepo("messagesRepo");
   const navigation = useNavigation();
   const { chatId } = useLocalSearchParams<{ chatId: string }>();
-  const { sendMessage } = useMessaging(
+  const { sendMessage, encodeMessage } = useMessaging(
     DATA_SERVICE_UUID,
     COLOR_CHARACTERISTIC_UUID,
   );
@@ -118,7 +119,7 @@ export default function Chat() {
 
       setMessages([...messages, newMsg]);
       setNewMessage("");
-      sendMessage(newMsg, peerId!, "recip");
+      BleModule.broadcastPacketAsync(encodeMessage(newMsg, "from", "to"));
 
       // scroll to the end of the list to show the new message
       flatListRef.current?.scrollToEnd({ animated: true });

@@ -48,8 +48,41 @@ function useBleMessaging(
     return Result.SUCCESS;
   };
 
+  const encodeMessage = (
+    message: Message,
+    from: string,
+    to: string,
+  ): Uint8Array => {
+    const encodedMessage = toBinaryPayload(message);
+
+    if (!encodedMessage) {
+      throw Error(`Failed to encode message [messageId: ${message.id}]`);
+    }
+
+    const packet: BitchatPacket = {
+      version: 1,
+      type: PacketType.MESSAGE,
+      senderId: from,
+      recipientId: to,
+      timestamp: Date.now(),
+      payload: encodedMessage,
+      signature: null,
+      allowedHops: 3,
+      route: new Uint8Array(),
+    };
+
+    const encodedPacket = encode(packet);
+
+    if (!encodedPacket) {
+      throw Error(`Failed to encode packet [messageId: ${message.id}]`);
+    }
+
+    return encodedPacket;
+  };
+
   return {
     sendMessage,
+    encodeMessage,
   };
 }
 
