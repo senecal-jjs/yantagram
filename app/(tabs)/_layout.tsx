@@ -1,7 +1,6 @@
 import { Tabs } from "expo-router";
 import React from "react";
 
-import { useBluetooth } from "@/components/bluetooth-context";
 import { HapticTab } from "@/components/haptic-tab";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { Colors } from "@/constants/theme";
@@ -10,24 +9,24 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 export default function TabLayout() {
   const colorScheme = useColorScheme();
 
-  const { scan, advertise, permissions } = useBluetooth();
+  // const { scan, advertise, permissions } = useBluetooth();
 
-  const advertiseNow = async () => {
-    const isPermissionsEnabled = await permissions();
-    if (isPermissionsEnabled) {
-      advertise();
-    }
-  };
+  // const advertiseNow = async () => {
+  //   const isPermissionsEnabled = await permissions();
+  //   if (isPermissionsEnabled) {
+  //     advertise();
+  //   }
+  // };
 
-  const scanForDevices = async () => {
-    const isPermissionsEnabled = await permissions();
-    if (isPermissionsEnabled) {
-      scan();
-    }
-  };
+  // const scanForDevices = async () => {
+  //   const isPermissionsEnabled = await permissions();
+  //   if (isPermissionsEnabled) {
+  //     scan();
+  //   }
+  // };
 
-  advertiseNow();
-  scanForDevices();
+  // advertiseNow();
+  // scanForDevices();
 
   return (
     <Tabs

@@ -16,12 +16,21 @@ import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 
 import { ChatBubble } from "@/components/chat-bubble";
 import { useRepos } from "@/components/repository-context";
-import { COLOR_CHARACTERISTIC_UUID, DATA_SERVICE_UUID } from "@/hooks/use-ble";
-import useMessaging from "@/hooks/use-ble-messaging";
 import BleModule from "@/modules/ble/src/BleModule";
-import { DeliveryStatus, Message } from "@/types/global";
+import { decode, encode } from "@/services/packet-service";
+import {
+  fromBinaryPayload,
+  toBinaryPayload,
+} from "@/services/protocol-service";
+import {
+  BitchatPacket,
+  DeliveryStatus,
+  Message,
+  PacketType,
+} from "@/types/global";
 import { getRandomBytes } from "@/utils/random";
 import { secureFetch, secureStore } from "@/utils/secure-store";
+import { useEventListener } from "expo";
 
 // TODO (create during onboarding)
 getRandomBytes(8).then((bytes) => secureStore("peerId", bytes.toString()));
@@ -31,11 +40,15 @@ export default function Chat() {
   const messagesRepo = getRepo("messagesRepo");
   const navigation = useNavigation();
   const { chatId } = useLocalSearchParams<{ chatId: string }>();
-  const { sendMessage, encodeMessage } = useMessaging(
-    DATA_SERVICE_UUID,
-    COLOR_CHARACTERISTIC_UUID,
-  );
   const [peerId, setPeerId] = useState<string | null>(null);
+
+  useEventListener(BleModule, "onPeripheralReceivedWrite", (message) => {
+    decodeMessage(message.rawBytes);
+  });
+
+  useEventListener(BleModule, "onCentralReceivedNotification", (message) => {
+    decodeMessage(message.rawBytes);
+  });
 
   useEffect(() => {
     navigation.setOptions({
@@ -64,6 +77,44 @@ export default function Chat() {
 
     return () => clearInterval(intervalId);
   }, []);
+
+  const decodeMessage = (rawBytes: Uint8Array) => {
+    const packet = decode(rawBytes)!;
+    const payload = fromBinaryPayload(packet?.payload);
+    console.log(payload);
+  };
+
+  const encodeMessage = (
+    message: Message,
+    from: string,
+    to: string,
+  ): Uint8Array => {
+    const encodedMessage = toBinaryPayload(message);
+
+    if (!encodedMessage) {
+      throw Error(`Failed to encode message [messageId: ${message.id}]`);
+    }
+
+    const packet: BitchatPacket = {
+      version: 1,
+      type: PacketType.MESSAGE,
+      senderId: from,
+      recipientId: to,
+      timestamp: Date.now(),
+      payload: encodedMessage,
+      signature: null,
+      allowedHops: 3,
+      route: new Uint8Array(),
+    };
+
+    const encodedPacket = encode(packet);
+
+    if (!encodedPacket) {
+      throw Error(`Failed to encode packet [messageId: ${message.id}]`);
+    }
+
+    return encodedPacket;
+  };
 
   const renderMessage = ({ item }: { item: Message }) => {
     return <ChatBubble message={item} peerId={peerId!} />;

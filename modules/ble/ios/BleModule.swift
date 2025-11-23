@@ -2,9 +2,6 @@ import Foundation
 import CoreBluetooth
 import Combine
 import CryptoKit
-#if os(iOS)
-import UIKit
-#endif
 
 import ExpoModulesCore
 
@@ -14,9 +11,8 @@ struct PeerID: Hashable {
 
 public class BleModule: Module {
   private let notificationCenter: NotificationCenter = .default
-  private var peripheralWriteObserver: NSObjectProtocol?
-  private var bleManager: BleManager?
-  
+  private var bleManager: BleManager? = nil
+ 
   // Each module class must implement the definition function. The definition consists of components
   // that describes the module's functionality and behavior.
   // See https://docs.expo.dev/modules/module-api for more details about available components.
@@ -27,23 +23,7 @@ public class BleModule: Module {
     Name("Ble")
     
     // MARK: - initialization
-    // OnCreate {
-    //   <#code#>
-    // }
-    
-    // OnDestroy {
-    //   <#code#>
-    // }
-    
-    // Defines constant property on the module.
-    Constant("PI") {
-      Double.pi
-    }
-    
-    // Defines event names that the module can send to JavaScript.
-    Events("onPeripheralReceivedWrite", "onCentralReceivedNotification")
-    
-    OnStartObserving("onPeripheralReceivedWrite") {
+    OnCreate {
       bleManager = BleManager(
         writeObserver: { data in
           self.sendEvent(
@@ -62,6 +42,39 @@ public class BleModule: Module {
           )
         }
       )
+    }
+    
+    // OnDestroy {
+    //   <#code#>
+    // }
+  
+    // Defines constant property on the module.
+    Constant("PI") {
+      Double.pi
+    }
+    
+    // Defines event names that the module can send to JavaScript.
+    Events("onPeripheralReceivedWrite", "onCentralReceivedNotification")
+    
+    OnStartObserving("onPeripheralReceivedWrite") {
+      // bleManager = BleManager(
+      //   writeObserver: { data in
+      //     self.sendEvent(
+      //       "onPeripheralReceivedWrite",
+      //       [
+      //         "rawBytes": data
+      //       ]
+      //     )
+      //   },
+      //   notifyObserver: { data in
+      //     self.sendEvent(
+      //       "onCentralReceivedNotification",
+      //       [
+      //         "rawBytes": data
+      //       ]
+      //     )
+      //   }
+      // )
     }
     
     // OnStopObserving("onPeripheralReceivedWrite") {
@@ -85,12 +98,19 @@ public class BleModule: Module {
     AsyncFunction("broadcastPacketAsync") { (value: Data) in
       // write to connected peripherals
       // notify subscribed centrals
-      if let bm = bleManager {
-        bm.broadcastPacket(packet: value)
-      } else {
-        print("❌ Failed to broadcast packet")
-      }
+     if let bm = bleManager {
+      print("Broadcasting!")
+       bm.broadcastPacket(packet: value)
+     } else {
+       print("❌ Failed to broadcast packet")
+     }
     }
+  }
+}
+
+final class TestManager: NSObject {
+  init(writeObserver: @escaping (Data) -> Void, notifyObserver: @escaping (Data) -> Void) {
+    super.init()
   }
 }
 
@@ -163,6 +183,7 @@ final class BleManager: NSObject {
   init(writeObserver: @escaping (Data) -> Void, notifyObserver: @escaping (Data) -> Void) {
     self.peripheralWriteObserver = writeObserver
     self.notifyObserver = notifyObserver
+    super.init()
     
     // Set up application state tracking (iOS only)
     #if os(iOS)
@@ -200,18 +221,17 @@ final class BleManager: NSObject {
     ]
     centralManager = CBCentralManager(delegate: self, queue: bleQueue, options: centralOptions)
     
-    let peripheralOptions: [String: Any] = [
-      CBPeripheralManagerOptionRestoreIdentifierKey: BleManager.peripheralRestorationID
-    ]
-    peripheralManager = CBPeripheralManager(delegate: self, queue: bleQueue, options: peripheralOptions)
-    #else
-    centralManager = CBCentralManager(delegate: self, queue: bleQueue)
-    peripheralManager = CBPeripheralManager(delegate: self, queue: bleQueue)
-    #endif
+     let peripheralOptions: [String: Any] = [
+       CBPeripheralManagerOptionRestoreIdentifierKey: BleManager.peripheralRestorationID
+     ]
+     peripheralManager = CBPeripheralManager(delegate: self, queue: bleQueue, options: peripheralOptions)
+     #else
+     centralManager = CBCentralManager(delegate: self, queue: bleQueue)
+     peripheralManager = CBPeripheralManager(delegate: self, queue: bleQueue)
+     #endif
   }
   
   deinit {
-    <#statements#>
     centralManager?.stopScan()
     peripheralManager?.stopAdvertising()
     #if os(iOS)
@@ -224,8 +244,8 @@ final class BleManager: NSObject {
       isAppActive = true
       // Restart scanning with allow duplicates when app becomes active
       if centralManager?.state == .poweredOn {
-          centralManager?.stopScan()
-  //        startScanning()
+        centralManager?.stopScan()
+        startScanning()
       }
   //    logBluetoothStatus("became-active")
   //    scheduleBluetoothStatusSample(after: 5.0, context: "active-5s")
@@ -237,7 +257,7 @@ final class BleManager: NSObject {
       // Restart scanning without allow duplicates in background
       if centralManager?.state == .poweredOn {
           centralManager?.stopScan()
-  //        startScanning()
+          startScanning()
       }
   //    logBluetoothStatus("entered-background")
   //    scheduleBluetoothStatusSample(after: 15.0, context: "background-15s")
@@ -259,14 +279,19 @@ final class BleManager: NSObject {
       subscribedCentrals = []
     }
     
+    print("Connected Peripherals: \(connectedPeripheralIds)")
+    print("Subscribed Centrals: \(subscribedCentrals.map { $0.identifier.uuidString })")
+    
     // writes to selected connected peripherals
     for s in peripheralStates where s.isConnected {
       let pid = s.peripheral.identifier.uuidString
       guard connectedPeripheralIds.contains(pid) else { continue }
+      print("past connected peripheral id guard")
       if let ch = s.characteristic {
+        print("through characteristic check")
         bleQueue.async { [weak self] in
-          guard let self = self else { return }
           if s.peripheral.canSendWriteWithoutResponse {
+            print("writing to connected peripheral")
             s.peripheral.writeValue(packet, for: ch, type: .withoutResponse)
           }
         }
@@ -330,7 +355,7 @@ extension BleManager: CBCentralManagerDelegate {
     }
     
     public func centralManager(_ central: CBCentralManager, didDiscover peripheral: CBPeripheral, advertisementData: [String : Any], rssi RSSI: NSNumber) {
-        print("📡 Discovered peripheral: \(peripheral.identifier.uuidString) RSSI: \(RSSI)")
+        // print("📡 Discovered peripheral: \(peripheral.identifier.uuidString) RSSI: \(RSSI)")
         
         // Handle discovered peripheral
         // Example: Connect to peripheral if needed
@@ -494,7 +519,7 @@ extension BleManager: CBCentralManagerDelegate {
     
     #if os(iOS)
     public func centralManager(_ central: CBCentralManager, willRestoreState dict: [String : Any]) {
-        print("🔄 BLE Central: Restoring state")
+      print("🔄 BLE Central: Restoring state")
       let restoredPeripherals = (dict[CBCentralManagerRestoredStatePeripheralsKey] as? [CBPeripheral]) ?? []
       let restoredServices = (dict[CBCentralManagerRestoredStateScanServicesKey] as? [CBUUID]) ?? []
       let restoredOptions = (dict[CBCentralManagerRestoredStateScanOptionsKey] as? [String: Any]) ?? [:]
@@ -528,6 +553,18 @@ extension BleManager: CBCentralManagerDelegate {
     #endif
   
   private func startScanning() {
+    print("Attempting to start scanning")
+    
+    let central = centralManager!
+    
+    guard central.state == .poweredOn else { return }
+            
+            print("central powered on in start scan")
+            
+    guard !central.isScanning else { return }
+    
+    print("central is not already scanning")
+
       guard let central = centralManager,
             central.state == .poweredOn,
             !central.isScanning else { return }
@@ -546,6 +583,7 @@ extension BleManager: CBCentralManagerDelegate {
       )
       
       // Started BLE scanning
+      print("✅ Central started scanning")
   }
 }
 
@@ -573,6 +611,9 @@ extension BleManager: CBPeripheralManagerDelegate {
           // create service
           let service = CBMutableService(type: BleManager.serviceUUID, primary: true)
           service.characteristics = [characteristic!]
+           // Add service (advertising will start in didAdd delegate)
+          print("🔧 Adding BLE service...")
+          peripheral.add(service)
         case .poweredOff:
             print("❌ BLE Peripheral: Powered Off")
         case .resetting:
@@ -801,6 +842,8 @@ extension BleManager: CBPeripheralDelegate {
           if !characteristic.properties.contains(.write) {
               print("⚠️ Characteristic doesn't support reliable writes (withResponse)!")
           }
+    
+          print("Discovered characteristic for peripheral")
           
           // Store characteristic in our consolidated structure
           let peripheralID = peripheral.identifier.uuidString
@@ -828,6 +871,8 @@ extension BleManager: CBPeripheralDelegate {
           print("⚠️ No data in notification")
           return
       }
+
+      print("🔔 Central received notification from peripheral")
 
       let peripheralUUID = peripheral.identifier.uuidString
 

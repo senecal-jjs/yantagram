@@ -13,7 +13,15 @@
       "bundleIdentifier": "com.bitcli.bitchat",
       "infoPlist": {
         "NSBluetoothAlwaysUsageDescription": "This app uses Bluetooth to create a peripheral device",
-        "NSBluetoothPeripheralUsageDescription": "This app uses Bluetooth to create a peripheral device"
+        "NSBluetoothPeripheralUsageDescription": "This app uses Bluetooth to create a peripheral device",
+        "UIBackgroundModes": ["bluetooth-central", "bluetooth-peripheral"],
+	      "NSCameraUsageDescription": "bitchat uses the camera to scan QR codes to verify peers.",
+	      "NSPhotoLibraryUsageDescription": "bitchat lets you pick images from your photo library to share with nearby peers.",
+	      "NSMicrophoneUsageDescription": "bitchat uses the microphone to record voice notes that relay across the mesh.",
+	      "NSLocationWhenInUseUsageDescription": "bitchat uses your approximate location to compute local geohash channels for optional public chats. Exact GPS is never shared.",
+	      "UILaunchStoryboardName": "LaunchScreen",
+	      "UIRequiresFullScreen": true,
+	      "UISupportedInterfaceOrientations": ["UIInterfaceOrientationPortrait"],
       }
     },
     "android": {
@@ -64,7 +72,8 @@
         }
       ],
       "expo-sqlite",
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-asset"
     ],
     "experiments": {
       "typedRoutes": true,
