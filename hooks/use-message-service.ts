@@ -14,12 +14,12 @@ export function useMessageService(): MessageService {
   const mutex = new Mutex();
   const { getRepo } = useRepos();
   const messagesRepo = getRepo("messagesRepo");
-  const { messages, setMessages } = useMessageProvider();
+  const { setMessages } = useMessageProvider();
 
   const sendMessage = (message: Message, from: string, to: string) => {
     const encoded = encodeMessage(message, from, to);
     messagesRepo.create(message);
-    setMessages([...messages, message]);
+    setMessages((prev) => [...prev, message]);
     BleModule.broadcastPacketAsync(encoded);
   };
 
@@ -43,7 +43,7 @@ export function useMessageService(): MessageService {
           console.log("Received MESSAGE packet");
           // Handle public chat message
           messagesRepo.create(payload);
-          setMessages([...messages, payload]);
+          setMessages((prev) => [...prev, payload]);
           break;
 
         case PacketType.LEAVE:

@@ -18,18 +18,19 @@ import { ChatBubble } from "@/components/chat-bubble";
 import { useMessageProvider } from "@/contexts/message-context";
 import { useMessageService } from "@/hooks/use-message-service";
 import { DeliveryStatus, Message } from "@/types/global";
-import { getRandomBytes } from "@/utils/random";
-import { secureFetch, secureStore } from "@/utils/secure-store";
+import { secureFetch } from "@/utils/secure-store";
 
 // TODO (create during onboarding)
-getRandomBytes(8).then((bytes) => secureStore("peerId", bytes.toString()));
+// getRandomBytes(8).then((bytes) => secureStore("peerId", bytes.toString()));
 
 export default function Chat() {
   const navigation = useNavigation();
   const { chatId } = useLocalSearchParams<{ chatId: string }>();
   const [peerId, setPeerId] = useState<string | null>(null);
   const { sendMessage } = useMessageService();
-  const { messages, setMessages } = useMessageProvider();
+  const { messages } = useMessageProvider();
+  // A ref to automatically scroll the message list
+  const flatListRef = useRef<FlatList>(null);
 
   useEffect(() => {
     navigation.setOptions({
@@ -38,42 +39,16 @@ export default function Chat() {
   }, [navigation]);
 
   useEffect(() => {
+    console.log("fetching peer id");
     secureFetch("peerId").then((peerId) => setPeerId(peerId));
   }, []);
-
-  // useEffect(() => {
-  //   const initialFetchData = async (limit: number) => {
-  //     const initialMessages = await messagesRepo.getAll(limit);
-  //     setMessages(initialMessages);
-  //   };
-
-  //   const fetchData = async () => {
-  //     let newMessages = await messagesRepo.getAll(1);
-  //     newMessages = newMessages.filter(
-  //       (message) => message.timestamp > lastSeen,
-  //     );
-  //     setMessages((prevMessages) => [...prevMessages, ...newMessages]);
-  //     setLastSeen(Date.now());
-  //   };
-
-  //   initialFetchData(50);
-
-  //   const intervalId = setInterval(fetchData, 1000);
-
-  //   return () => clearInterval(intervalId);
-  // }, [messagesRepo]);
 
   const renderMessage = ({ item }: { item: Message }) => {
     return <ChatBubble message={item} peerId={peerId!} />;
   };
 
-  // const [messages, setMessages] = useState<Message[]>([]);
-
   // State for the new message input
   const [newMessage, setNewMessage] = useState("");
-
-  // A ref to automatically scroll the message list
-  const flatListRef = useRef<FlatList>(null);
 
   const handleSend = () => {
     if (newMessage.trim()) {
@@ -90,7 +65,6 @@ export default function Chat() {
         deliveryStatus: DeliveryStatus.SENDING,
       };
 
-      setMessages([...messages, newMsg]);
       setNewMessage("");
       sendMessage(newMsg, peerId!, "to");
 

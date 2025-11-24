@@ -68,7 +68,7 @@ class SQMessageRepository implements MessageRepository {
 
   async getAll(limit: number): Promise<Message[]> {
     const statement = await this.db.prepareAsync(
-      "SELECT * FROM messages ORDER BY timestamp DESC LIMIT $limit",
+      "SELECT * FROM messages ORDER BY timestamp ASC LIMIT $limit",
     );
 
     try {
