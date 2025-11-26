@@ -21,6 +21,9 @@ enum PacketType {
 
   FRAGMENT, // Single fragment type for large messages
   FILE_TRANSFER, // Binary file/audio/image payloads
+
+  DELIVERY_ACK, // acknowledge delivery of a message to intended recipient
+  READ_RECEIPT,
 }
 
 // Represents a user visible message in the BitChat system.
@@ -55,7 +58,7 @@ type BitchatPacket = {
   version: number;
   type: PacketType;
   senderId: string;
-  recipientId: string | null;
+  recipientId: string;
   timestamp: number;
   payload: Uint8Array;
   signature: string | null;

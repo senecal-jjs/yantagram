@@ -1,11 +1,20 @@
-import SQMessageRepository from "@/repos/impls/sq-message-repository";
-import MessageRepository from "@/repos/specs/message-repository";
+import SQFragmentsRepository from "@/repos/impls/sq-fragments-repository";
+import SQMessagesRepository from "@/repos/impls/sq-messages-repository";
+import SQOutgoingMessagesRepository from "@/repos/impls/sq-outgoing-messages-repository";
+import Repository from "@/repos/specs/repository";
 import { useSQLiteContext } from "expo-sqlite";
 import React, { createContext, useContext } from "react";
 
+// Symbols to represent repository interfaces
+export const MessagesRepositoryToken = Symbol("MessagesRepository");
+export const FragmentsRepositoryToken = Symbol("FragmentsRepository");
+export const OutgoingMessagesRepositoryToken = Symbol(
+  "OutgoingMessagesRepository",
+);
+
 interface RepositoryContextType {
-  repos: Map<string, MessageRepository>;
-  getRepo: (name: string) => MessageRepository;
+  repos: Map<symbol, Repository>;
+  getRepo: <T extends Repository>(token: symbol) => T;
 }
 
 const RepositoryContext = createContext<RepositoryContextType | undefined>(
@@ -16,17 +25,24 @@ export const RepositoryProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
   const db = useSQLiteContext();
-  const repos = new Map<string, MessageRepository>();
+  const repos = new Map<symbol, Repository>();
 
-  repos.set("messagesRepo", new SQMessageRepository(db));
+  // Initialize all repositories
+  repos.set(MessagesRepositoryToken, new SQMessagesRepository(db));
+  repos.set(FragmentsRepositoryToken, new SQFragmentsRepository(db));
+  repos.set(
+    OutgoingMessagesRepositoryToken,
+    new SQOutgoingMessagesRepository(db),
+  );
 
-  const getRepo = (name: string): MessageRepository => {
-    const repo = repos.get(name);
+  function getRepo<T extends Repository>(token: symbol): T {
+    const repo = repos.get(token);
 
-    if (repo === undefined) throw new Error(`Cannot find repository ${name}`);
+    if (repo === undefined)
+      throw new Error(`Cannot find repository for ${String(token)}`);
 
-    return repo;
-  };
+    return repo as T;
+  }
 
   const value = { repos, getRepo };
 

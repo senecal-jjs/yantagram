@@ -86,7 +86,7 @@ const encode = (
 
   // Flags
   let flagsByte = 0;
-  if (packet.recipientId) flagsByte |= flags.hasRecipient;
+  flagsByte |= flags.hasRecipient; // recipientId is now always present
   if (packet.signature) flagsByte |= flags.hasSignature;
   if (isCompressed) flagsByte |= flags.isCompressed;
   if (hasRoute) flagsByte |= flags.hasRoute;
@@ -104,13 +104,11 @@ const encode = (
   senderPadded.set(senderBytes.subarray(0, senderIdSize));
   data.push(...Array.from(senderPadded));
 
-  // Recipient ID (8 bytes, if present)
-  if (packet.recipientId) {
-    const recipientBytes = textEncoder.encode(packet.recipientId);
-    const recipientPadded = new Uint8Array(recipientIdSize);
-    recipientPadded.set(recipientBytes.subarray(0, recipientIdSize));
-    data.push(...Array.from(recipientPadded));
-  }
+  // Recipient ID (8 bytes, always present)
+  const recipientBytes = textEncoder.encode(packet.recipientId);
+  const recipientPadded = new Uint8Array(recipientIdSize);
+  recipientPadded.set(recipientBytes.subarray(0, recipientIdSize));
+  data.push(...Array.from(recipientPadded));
 
   // Route data (if present)
   if (hasRoute) {
@@ -253,21 +251,19 @@ const decodeCore = (raw: Uint8Array): BitchatPacket | null => {
     ),
   );
 
-  // Read recipient ID (if present)
-  let recipientId: string | null = null;
-  if (hasRecipient) {
-    const recipientIdBytes = readData(recipientIdSize);
-    if (!recipientIdBytes) return null;
+  // Read recipient ID (always present)
+  if (!hasRecipient) return null; // Recipient ID is required
+  const recipientIdBytes = readData(recipientIdSize);
+  if (!recipientIdBytes) return null;
 
-    // Convert recipient ID bytes to string, removing null padding
-    const recipientIdEnd = recipientIdBytes.findIndex((b) => b === 0);
-    recipientId = textDecoder.decode(
-      recipientIdBytes.slice(
-        0,
-        recipientIdEnd === -1 ? recipientIdBytes.length : recipientIdEnd,
-      ),
-    );
-  }
+  // Convert recipient ID bytes to string, removing null padding
+  const recipientIdEnd = recipientIdBytes.findIndex((b) => b === 0);
+  const recipientId = textDecoder.decode(
+    recipientIdBytes.slice(
+      0,
+      recipientIdEnd === -1 ? recipientIdBytes.length : recipientIdEnd,
+    ),
+  );
 
   // Read route data (if present)
   let route: Uint8Array | null = null;
@@ -357,7 +353,7 @@ const decodeCore = (raw: Uint8Array): BitchatPacket | null => {
     version,
     type,
     senderId,
-    recipientId: recipientId || "", // Default to empty string if not present
+    recipientId,
     timestamp: timestamp,
     payload: payloadData,
     signature,
