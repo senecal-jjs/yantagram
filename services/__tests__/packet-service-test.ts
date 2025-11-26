@@ -1,5 +1,8 @@
 import { BitchatPacket, DeliveryStatus, Message } from "@/types/global";
-import { fromBinaryPayload, toBinaryPayload } from "../message-protocol-service";
+import {
+  fromBinaryPayload,
+  toBinaryPayload,
+} from "../message-protocol-service";
 import { decode, encode } from "../packet-protocol-service";
 
 test("encode & decode packet", () => {

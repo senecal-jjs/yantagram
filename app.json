@@ -67,6 +67,15 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "ble": {
+        "outgoingMessageRetryIntervalSeconds": 30,
+        "mtuLimitBytes": 512,
+        "defaultFragmentSizeBytes": 469
+        // "mtuLimitBytes": 100,
+        // "defaultFragmentSizeBytes": 25
+      }
     }
   }
 }

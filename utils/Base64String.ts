@@ -194,5 +194,4 @@ class Base64String {
   }
 }
 
-export default Base64String;
 export { Base64String };

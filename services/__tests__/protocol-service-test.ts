@@ -1,5 +1,8 @@
 import { DeliveryStatus, Message } from "@/types/global";
-import { fromBinaryPayload, toBinaryPayload } from "../message-protocol-service";
+import {
+  fromBinaryPayload,
+  toBinaryPayload,
+} from "../message-protocol-service";
 
 test("protocol encodes & decodes", () => {
   const message: Message = {

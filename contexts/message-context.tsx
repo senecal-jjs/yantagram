@@ -1,3 +1,4 @@
+import MessagesRepository from "@/repos/specs/messages-repository";
 import { Message } from "@/types/global";
 import React, {
   createContext,
@@ -6,7 +7,7 @@ import React, {
   useMemo,
   useState,
 } from "react";
-import { useRepos } from "./repository-context";
+import { MessagesRepositoryToken, useRepos } from "./repository-context";
 
 interface MessageContextType {
   messages: Message[];
@@ -19,7 +20,10 @@ export const MessageProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
   const { getRepo } = useRepos();
-  const messagesRepo = useMemo(() => getRepo("messagesRepo"), [getRepo]);
+  const messagesRepo = useMemo(
+    () => getRepo<MessagesRepository>(MessagesRepositoryToken),
+    [getRepo],
+  );
   const [messages, setMessages] = useState<Message[]>([]);
   const value = { messages, setMessages };
 
