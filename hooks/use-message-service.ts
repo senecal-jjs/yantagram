@@ -123,25 +123,6 @@ export function useMessageService(): MessageService {
     outgoingMessagesRepo.create(message);
   };
 
-  // const sendFragments = async (fragments: BitchatPacket[]) => {
-  //   fragments.forEach((fragment) => {
-  //     const encodedPacket = encode(fragment);
-
-  //     if (!encodedPacket) {
-  //       throw new Error(`Failed to encode fragment`);
-  //     }
-
-  //     const metadata = extractFragmentMetadata(fragment);
-
-  //     sleep(1000).then(() => {
-  //       console.log(`broadcasting fragment index: ${metadata?.index}`);
-  //       BleModule.broadcastPacketAsync(encodedPacket);
-  //     });
-  //     // pacing to avoid overwhelming the connection
-  //     // await sleep(1000);
-  //   });
-  // };
-
   const sendFragments = async (fragments: BitchatPacket[]) => {
     for (const fragment of fragments) {
       const encodedPacket = encode(fragment);
