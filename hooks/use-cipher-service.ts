@@ -1,6 +1,7 @@
 import * as Crypto from "expo-crypto";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
+  CiphersuiteImpl,
   ClientState,
   createApplicationMessage,
   createCommit,
@@ -19,20 +20,47 @@ import {
   KeyPackage,
   PrivateKeyPackage,
   PrivateMessage,
+  processPrivateMessage,
   Proposal,
   Welcome,
 } from "ts-mls";
+import { MLSMessage } from "ts-mls/message.js";
 
 type MLSKeyPackage = {
   publicPackage: KeyPackage;
   privatePackage: PrivateKeyPackage;
 };
 
-const impl = await getCiphersuiteImpl(
-  getCiphersuiteFromName("MLS_256_XWING_AES256GCM_SHA512_Ed25519"),
-);
-
 export function useCipherService() {
+  // Load the ciphersuite implementation in a React effect
+  const implRef = useRef<CiphersuiteImpl | null>(null);
+  const implWaiters = useRef<((impl: CiphersuiteImpl) => void)[]>([]);
+
+  const ensureImpl = async (): Promise<CiphersuiteImpl> => {
+    if (implRef.current) return implRef.current;
+    return new Promise((resolve) => {
+      implWaiters.current.push(resolve);
+    });
+  };
+
+  useEffect(() => {
+    let mounted = true;
+    const loadImpl = async () => {
+      const implementation = await getCiphersuiteImpl(
+        getCiphersuiteFromName("MLS_256_XWING_AES256GCM_SHA512_Ed25519"),
+      );
+      if (!mounted) return;
+      implRef.current = implementation;
+      // Resolve any waiters
+      implWaiters.current.forEach((fn) => fn(implementation));
+      implWaiters.current = [];
+    };
+    loadImpl();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   // map of group id to MLS client state
   const [clientState, setClientState] = useState<Map<string, ClientState>>(
     new Map(),
@@ -56,6 +84,7 @@ export function useCipherService() {
   const getKeyPackage = async (
     credential: Credential,
   ): Promise<MLSKeyPackage> => {
+    const impl = await ensureImpl();
     return await generateKeyPackage(
       credential,
       defaultCapabilities(),
@@ -70,6 +99,7 @@ export function useCipherService() {
     initialKeyPackage: MLSKeyPackage,
   ): Promise<ClientState> => {
     const id = new TextEncoder().encode(groupId);
+    const impl = await ensureImpl();
     return await createGroup(
       id,
       initialKeyPackage.publicPackage,
@@ -92,6 +122,7 @@ export function useCipherService() {
     group: ClientState,
     proposal: Proposal,
   ): Promise<CreateCommitResult> => {
+    const impl = await ensureImpl();
     return await createCommit(
       { state: group, cipherSuite: impl },
       {
@@ -105,6 +136,7 @@ export function useCipherService() {
     welcome: Welcome,
     outsiderKeyPackage: MLSKeyPackage,
   ): Promise<ClientState> => {
+    const impl = await ensureImpl();
     return await joinGroup(
       welcome,
       outsiderKeyPackage.publicPackage,
@@ -114,31 +146,37 @@ export function useCipherService() {
     );
   };
 
-  const startGroup = async (
-    peerId: string,
+  const addPeer = async (
+    groupId: string,
     peerToAdd: KeyPackage,
-    groupId: string | null,
-  ): Promise<{
-    groupId: string;
-    clientState: ClientState;
-    welcome: Welcome;
-  }> => {
-    const credential = getPeerCredential(peerId);
-    const keyPkg = await getKeyPackage(credential);
-    const resolvedGroupId = groupId ? groupId : Crypto.randomUUID();
-    const group = await constructGroup(resolvedGroupId, keyPkg);
+  ): Promise<Welcome> => {
     const peerToAddProposal = getAddMemberProposal(peerToAdd);
-    const commitResult = await commitProposal(group, peerToAddProposal);
+    const commitResult = await commitProposal(
+      clientState.get(groupId)!,
+      peerToAddProposal,
+    );
 
     if (!commitResult.welcome)
       throw new Error("Failed to constuct Welcome when starting group!");
 
-    updateClientState(resolvedGroupId, commitResult.newState);
+    updateClientState(groupId, commitResult.newState);
+
+    return commitResult.welcome;
+  };
+
+  const startGroup = async (
+    peerId: string,
+    groupId: string | null,
+  ): Promise<{ groupId: string }> => {
+    const credential = getPeerCredential(peerId);
+    const keyPkg = await getKeyPackage(credential);
+    const resolvedGroupId = groupId ? groupId : Crypto.randomUUID();
+    const group = await constructGroup(resolvedGroupId, keyPkg);
+
+    updateClientState(resolvedGroupId, group);
 
     return {
       groupId: resolvedGroupId,
-      clientState: commitResult.newState,
-      welcome: commitResult.welcome,
     };
   };
 
@@ -174,22 +212,15 @@ export function useCipherService() {
   const decodeMLSMessage = (
     wireFormat: string,
     payload: Uint8Array,
-  ): Welcome | KeyPackage | PrivateMessage => {};
-
-  const decodeMLSWelcome = (welcome: Uint8Array): Welcome => {
-    const decoded = decodeMlsMessage(welcome, 0)![0];
-
-    if (decoded.wireformat !== "mls_welcome") {
-      throw new Error("Expected welcome");
-    }
-
-    return decoded.welcome;
+  ): MLSMessage => {
+    return decodeMlsMessage(payload, 0)![0];
   };
 
   const encryptMessage = async (
     groupId: string,
     contents: Uint8Array,
   ): Promise<PrivateMessage> => {
+    const impl = await ensureImpl();
     const messageResult = await createApplicationMessage(
       clientState.get(groupId)!,
       contents,
@@ -201,12 +232,36 @@ export function useCipherService() {
     return messageResult.privateMessage;
   };
 
-  const decryptMessage = async (groupId: string, contents: Uint8Array) => {};
+  const decryptMessage = async (
+    groupId: string,
+    message: PrivateMessage,
+  ): Promise<Uint8Array> => {
+    const impl = await ensureImpl();
+    const processMsgResult = await processPrivateMessage(
+      clientState.get(groupId)!,
+      message,
+      emptyPskIndex,
+      impl,
+    );
+
+    updateClientState(groupId, processMsgResult.newState);
+
+    if (processMsgResult.kind === "newState") {
+      throw new Error("Expected application message");
+    }
+
+    return processMsgResult.message;
+  };
 
   return {
     encryptMessage,
+    decryptMessage,
     startGroup,
     joinExistingGroup,
     encodeMLSMessage,
+    decodeMLSMessage,
+    getPeerCredential,
+    getKeyPackage,
+    addPeer,
   };
 }
