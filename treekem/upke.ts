@@ -1,0 +1,415 @@
+/**
+ * UPKE (Updatable Public Key Encryption) implementation for TreeKEM
+ * Uses Ristretto255 (Curve25519), Ed25519, RSA, and AES-256-GCM
+ */
+
+import { uint8ArrayToHexString } from "@/utils/string";
+import { gcm } from "@noble/ciphers/aes.js";
+import { ed25519, ristretto255 } from "@noble/curves/ed25519.js";
+import { hkdf } from "@noble/hashes/hkdf.js";
+import { sha256, sha512 } from "@noble/hashes/sha2.js";
+import { getRandomBytes } from "expo-crypto";
+// import { RSA } from "react-native-rsa-native";
+// @ts-ignore
+import { Crypt, RSA } from "hybrid-crypto-js";
+import { RistrettoPoint } from "./RistrettoPoint";
+import { Scalar } from "./scalar";
+import { Ciphertext } from "./types";
+
+// Note: For RSA operations, we'll need to use react-native-rsa-native or similar
+// For AES-GCM, we'll use expo-crypto or similar
+
+/**
+ * Secret key in UPKE scheme (Scalar)
+ */
+export class SecretKey {
+  private scalar: Scalar;
+
+  constructor(scalar: Scalar) {
+    this.scalar = scalar;
+  }
+
+  static new(): SecretKey {
+    // Use ed25519.utils.randomPrivateKey() which returns a proper 32-byte secret key
+    // This is already in the valid range and properly formatted
+    const randomScalar = ed25519.utils.randomSecretKey();
+    return new SecretKey(Scalar.fromBytes(randomScalar));
+  }
+
+  static fromBytesModOrder(bytes: Uint8Array): SecretKey {
+    if (bytes.length !== 32) {
+      throw new Error(
+        `Cannot construct secret key from bytes. Must have length 32, but length was ${bytes.length}`,
+      );
+    }
+    return new SecretKey(Scalar.fromBytes(bytes));
+  }
+
+  getScalar(): Scalar {
+    return this.scalar;
+  }
+
+  toBytes(): Uint8Array {
+    return this.scalar.toBytes();
+  }
+
+  /**
+   * Decrypt UPKE ciphertext
+   * Returns plaintext and new secret key
+   */
+  decrypt(ciphertext: Ciphertext): {
+    message: Uint8Array;
+    newSecretKey: SecretKey;
+  } {
+    // Reconstruct the Ristretto point from ciphertext
+    const c1 = ristretto255.Point.fromBytes(ciphertext.point);
+
+    // Compute shared secret: sk * c1
+    const sharedSecret = c1.multiply(this.scalar.getValue());
+
+    // Hash the shared secret
+    const hashed = sha512(sharedSecret.toBytes());
+
+    // XOR to decrypt message (first 32 bytes)
+    const message = new Uint8Array(32);
+    for (let i = 0; i < 32; i++) {
+      message[i] = hashed[i] ^ ciphertext.data[i];
+    }
+
+    // XOR to decrypt delta (remaining bytes)
+    const delta = new Uint8Array(32);
+    for (let i = 0; i < 32; i++) {
+      delta[i] = hashed[32 + i] ^ ciphertext.data[32 + i];
+    }
+
+    // Update secret key
+    const deltaScalar = Scalar.fromBytes(delta);
+
+    const newSk = this.scalar.getValue() + deltaScalar.getValue();
+
+    return {
+      message,
+      newSecretKey: new SecretKey(new Scalar(newSk)),
+    };
+  }
+}
+
+/**
+ * Public key in UPKE scheme (Ristretto point)
+ */
+export class PublicKey {
+  private point: RistrettoPoint;
+
+  constructor(point: RistrettoPoint) {
+    this.point = point;
+  }
+
+  static fromSecretKey(sk: SecretKey): PublicKey {
+    const basePoint = ristretto255.Point.BASE;
+    const point = basePoint.multiply(sk.getScalar().getValue());
+    return new PublicKey(new RistrettoPoint(point.toHex()));
+  }
+
+  static fromBytesModOrder(bytes: Uint8Array): PublicKey {
+    const point = RistrettoPoint.fromBytes(bytes);
+    return new PublicKey(point);
+  }
+
+  toBytes(): Uint8Array {
+    return this.point.toBytes();
+  }
+
+  /**
+   * Encrypt message using UPKE
+   * Returns ciphertext and new public key
+   */
+  encrypt(message: Uint8Array): {
+    ciphertext: Ciphertext;
+    newPublicKey: PublicKey;
+  } {
+    // Generate random scalar r
+    const r = Scalar.fromBytes(getRandomBytes(32));
+
+    // c1 = r * G
+    const c1 = ristretto255.Point.BASE.multiply(r.getValue());
+
+    // Generate random delta
+    const delta = Scalar.fromBytes(getRandomBytes(32));
+
+    // Combine message and delta
+    const combined = new Uint8Array(64);
+    combined.set(message, 0);
+    combined.set(delta.toBytes(), 32);
+
+    // Compute shared secret: r * pk
+    const sharedSecret = ristretto255.Point.fromHex(
+      this.point.getHex(),
+    ).multiply(r.getValue());
+
+    // Hash the shared secret
+    const hashed = sha512(sharedSecret.toBytes());
+
+    // XOR to encrypt
+    const c2 = new Uint8Array(64);
+    for (let i = 0; i < 64; i++) {
+      c2[i] = hashed[i] ^ combined[i];
+    }
+
+    // New public key: pk + delta * G
+    const deltaPoint = ristretto255.Point.BASE.multiply(delta.getValue());
+    const newPoint = ristretto255.Point.fromHex(this.point.getHex()).add(
+      deltaPoint,
+    );
+
+    return {
+      ciphertext: {
+        point: c1.toBytes(),
+        data: c2,
+      },
+      newPublicKey: new PublicKey(new RistrettoPoint(newPoint.toHex())),
+    };
+  }
+}
+
+/**
+ * UPKE key pair material
+ */
+export class UPKEMaterial {
+  publicKey: PublicKey;
+  privateKey: SecretKey;
+
+  constructor(publicKey: PublicKey, privateKey: SecretKey) {
+    this.publicKey = publicKey;
+    this.privateKey = privateKey;
+  }
+
+  static generate(): UPKEMaterial {
+    const sk = SecretKey.new();
+    const pk = PublicKey.fromSecretKey(sk);
+    return new UPKEMaterial(pk, sk);
+  }
+
+  static updatePublic(newPk: PublicKey, oldPk: PublicKey): PublicKey {
+    const newPoint = ristretto255.Point.fromBytes(newPk.toBytes()); // RistrettoPoint.fromHex(newPk.toBytes());
+    const oldPoint = ristretto255.Point.fromBytes(oldPk.toBytes()); // RistrettoPoint.fromHex(oldPk.toBytes());
+    const addedPoint = newPoint.add(oldPoint);
+    return new PublicKey(RistrettoPoint.fromBytes(addedPoint.toBytes()));
+  }
+
+  static updatePrivate(newSk: SecretKey, oldSk: SecretKey): SecretKey {
+    const newScalar = Scalar.fromBytes(newSk.toBytes());
+    const oldScalar = Scalar.fromBytes(oldSk.toBytes());
+    return new SecretKey(
+      new Scalar(newScalar.getValue() + oldScalar.getValue()),
+    );
+  }
+}
+
+/**
+ * Ed25519 signature material
+ */
+export class SignatureMaterial {
+  publicKey: Uint8Array;
+  privateKey: Uint8Array;
+
+  constructor(publicKey: Uint8Array, privateKey: Uint8Array) {
+    this.publicKey = publicKey;
+    this.privateKey = privateKey;
+  }
+
+  static generate(): SignatureMaterial {
+    const privateKey = ed25519.utils.randomSecretKey();
+    const publicKey = ed25519.getPublicKey(privateKey);
+    return new SignatureMaterial(publicKey, privateKey);
+  }
+
+  sign(message: Uint8Array): Uint8Array {
+    return ed25519.sign(message, this.privateKey);
+  }
+
+  static verify(
+    message: Uint8Array,
+    signature: Uint8Array,
+    publicKey: Uint8Array,
+  ): boolean {
+    return ed25519.verify(signature, message, publicKey);
+  }
+}
+
+/**
+ * RSA key pair (placeholder - needs native implementation)
+ */
+export class RSAKeyPair {
+  rsaPublicKey: string;
+  rsaPrivateKey: string;
+  crypt: any;
+
+  constructor(publicKey: string, privateKey: string) {
+    this.rsaPublicKey = publicKey;
+    this.rsaPrivateKey = privateKey;
+    this.crypt = new Crypt();
+  }
+
+  static async generate(): Promise<RSAKeyPair> {
+    const rsa = new RSA({ keySize: 4096 });
+    const keypair = await rsa.generateKeyPairAsync();
+    return new RSAKeyPair(keypair.publicKey, keypair.privateKey);
+  }
+
+  async encrypt(data: Uint8Array): Promise<Uint8Array> {
+    const encoder = new TextEncoder();
+    const encrypted = this.crypt.encrypt(
+      this.rsaPublicKey,
+      uint8ArrayToHexString(data),
+    );
+    return encoder.encode(encrypted);
+  }
+
+  async decrypt(ciphertext: Uint8Array): Promise<Uint8Array> {
+    // TODO: Implement RSA-PKCS1v15 decryption
+    const decoder = new TextDecoder();
+    const decoded = decoder.decode(ciphertext);
+    const decrypted = this.crypt.decrypt(this.rsaPrivateKey, decoded);
+    const buffer = Buffer.from(decrypted.message, "hex");
+    return new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+  }
+}
+
+/**
+ * Path secret operations for update paths
+ */
+export class PathSecret {
+  static newPathSecret(): Uint8Array {
+    return getRandomBytes(32);
+  }
+
+  static deriveKeyPair(pathSecret: Uint8Array): UPKEMaterial {
+    const info = new Uint8Array([
+      0xf0, 0xf1, 0xf2, 0xf3, 0xf4, 0xf5, 0xf6, 0xf7, 0xf8, 0xf9,
+    ]);
+    const okm = hkdf(sha256, pathSecret, undefined, info, 32);
+
+    const privateKey = SecretKey.fromBytesModOrder(okm);
+    const publicKey = PublicKey.fromSecretKey(privateKey);
+
+    return new UPKEMaterial(publicKey, privateKey);
+  }
+
+  static updateWithPathSecret(
+    pathSecret: Uint8Array,
+    oldPublicKey: PublicKey,
+    oldPrivateKey: SecretKey,
+  ): UPKEMaterial {
+    const info = new Uint8Array([
+      0xf0, 0xf1, 0xf2, 0xf3, 0xf4, 0xf5, 0xf6, 0xf7, 0xf8, 0xf9,
+    ]);
+    const okm = hkdf(sha256, pathSecret, undefined, info, 32);
+
+    const newPrivateKey = SecretKey.fromBytesModOrder(okm);
+    const newPublicKey = PublicKey.fromSecretKey(newPrivateKey);
+
+    // Combine old and new keys
+    const combinedPrivate = UPKEMaterial.updatePrivate(
+      newPrivateKey,
+      oldPrivateKey,
+    );
+    const combinedPublic = UPKEMaterial.updatePublic(
+      newPublicKey,
+      oldPublicKey,
+    );
+
+    return new UPKEMaterial(combinedPublic, combinedPrivate);
+  }
+
+  static update(
+    pathSecrets: UPKEMaterial,
+    oldPublicKey: PublicKey,
+    oldPrivateKey: SecretKey,
+  ): UPKEMaterial {
+    const newPublic = UPKEMaterial.updatePublic(
+      pathSecrets.publicKey,
+      oldPublicKey,
+    );
+    const newPrivate = UPKEMaterial.updatePrivate(
+      pathSecrets.privateKey,
+      oldPrivateKey,
+    );
+    return new UPKEMaterial(newPublic, newPrivate);
+  }
+
+  static updatePublic(newPk: PublicKey, oldPk: PublicKey): PublicKey {
+    return UPKEMaterial.updatePublic(newPk, oldPk);
+  }
+
+  static updatePrivate(newSk: SecretKey, oldSk: SecretKey): SecretKey {
+    return UPKEMaterial.updatePrivate(newSk, oldSk);
+  }
+}
+
+/**
+ * Node secret derivation
+ */
+export class NodeSecret {
+  static derive(pk: PublicKey, sk: SecretKey): Uint8Array {
+    const pkBytes = pk.toBytes();
+    const skBytes = sk.toBytes();
+
+    const nodeSecret = new Uint8Array(pkBytes.length + skBytes.length);
+    nodeSecret.set(pkBytes, 0);
+    nodeSecret.set(skBytes, pkBytes.length);
+
+    return nodeSecret;
+  }
+}
+
+/**
+ * Symmetric key operations using AES-256-GCM
+ */
+export class SymmetricKey {
+  static derive(nodeSecret: Uint8Array): Uint8Array {
+    const hashed = sha512(nodeSecret);
+    const info = new Uint8Array([
+      0xf0, 0xf1, 0xf2, 0xf3, 0xf4, 0xf5, 0xf6, 0xf7, 0xf8, 0xf9,
+    ]);
+    return hkdf(sha512, hashed, undefined, info, 32);
+  }
+
+  static deriveMessageKey(
+    nodeSecret: Uint8Array,
+    messageCounter: number,
+  ): Uint8Array {
+    let key = sha512(nodeSecret);
+
+    // Ratchet forward based on message counter
+    for (let i = 0; i < messageCounter; i++) {
+      key = sha512(key);
+    }
+
+    const info = new Uint8Array([
+      0xf0, 0xf1, 0xf2, 0xf3, 0xf4, 0xf5, 0xf6, 0xf7, 0xf8, 0xf9,
+    ]);
+    return hkdf(sha512, key, undefined, info, 32);
+  }
+
+  static encrypt(
+    message: Uint8Array,
+    key: Uint8Array,
+  ): { ciphertext: Uint8Array; nonce: Uint8Array } {
+    const nonce = getRandomBytes(12);
+    const aes = gcm(key, nonce);
+    const cipherText = aes.encrypt(message);
+    return {
+      ciphertext: cipherText,
+      nonce,
+    };
+  }
+
+  static decrypt(
+    ciphertext: Uint8Array,
+    key: Uint8Array,
+    nonce: Uint8Array,
+  ): Uint8Array {
+    const aes = gcm(key, nonce);
+    return aes.decrypt(ciphertext);
+  }
+}
