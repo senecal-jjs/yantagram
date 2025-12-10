@@ -2,7 +2,7 @@ import { useThemeColor } from "@/hooks/use-theme-color";
 import { serializeCredentialsForQR } from "@/treekem/protocol";
 import { Credentials } from "@/treekem/types";
 import React from "react";
-import { Button, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import QRCode from "react-native-qrcode-svg";
 
 export type CredentialsQRProps = {
@@ -11,7 +11,6 @@ export type CredentialsQRProps = {
   title?: string;
   lightColor?: string;
   darkColor?: string;
-  handleClose: () => void;
 };
 
 /**
@@ -24,7 +23,6 @@ export function CredentialsQR({
   title,
   lightColor,
   darkColor,
-  handleClose,
 }: CredentialsQRProps) {
   const backgroundColor = useThemeColor(
     { light: lightColor, dark: darkColor },
@@ -54,7 +52,6 @@ export function CredentialsQR({
       <Text style={[styles.pseudonym, { color: textColor }]}>
         {credentials.pseudonym}
       </Text>
-      <Button title="Close" onPress={handleClose} />
     </View>
   );
 }

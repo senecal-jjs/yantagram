@@ -24,6 +24,8 @@ const MAPPING = {
   message: "message",
   "square.and.pencil": "edit-note",
   qrcode: "qr-code",
+  "x.circle": "close",
+  "square.and.arrow.up": "ios-share",
 } as IconMapping;
 
 /**
