@@ -362,7 +362,7 @@ const NOUNS = [
 export function generateRandomName(): string {
   const adjective = ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)];
   const noun = NOUNS[Math.floor(Math.random() * NOUNS.length)];
-  return `${adjective} ${noun}`;
+  return `${adjective}-${noun}`;
 }
 
 /**

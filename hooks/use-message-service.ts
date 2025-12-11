@@ -142,7 +142,7 @@ export function useMessageService(): MessageService {
   };
 
   const handlePacket = async (packet: Uint8Array) => {
-    mutex.runExclusive(async () => {
+    await mutex.runExclusive(async () => {
       const decodedPacket = decode(packet);
 
       if (!decodedPacket) throw new Error("Failed to deserialize packet bytes");

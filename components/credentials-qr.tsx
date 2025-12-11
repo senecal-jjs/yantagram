@@ -50,7 +50,7 @@ export function CredentialsQR({
         />
       </View>
       <Text style={[styles.pseudonym, { color: textColor }]}>
-        {credentials.pseudonym}
+        @{credentials.pseudonym}
       </Text>
     </View>
   );

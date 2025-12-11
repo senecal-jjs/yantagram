@@ -77,10 +77,23 @@ async function migrateDb(db: SQLiteDatabase) {
         delivery_status INTEGER,
         created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
       );
+
+      CREATE TABLE IF NOT EXISTS contacts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        verification_key string NOT NULL,
+        pseudonym TEXT NOT NULL,
+        signature string NOT NULL,
+        ecdh_public_key string NOT NULL,
+        created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+        updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+        UNIQUE(verification_key)
+      );
+      
+      CREATE INDEX idx_contacts_pseudonym ON contacts(pseudonym);
 `);
     currentDbVersion = 1;
   }
-  // if (currentDbVersion === 1) {
+  // if (currentDbVersion === 2) {
   //   Add more migrations
   // }
   await db.execAsync(`PRAGMA user_version = ${DATABASE_VERSION}`);

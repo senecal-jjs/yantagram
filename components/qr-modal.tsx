@@ -1,11 +1,17 @@
 import { CredentialsQR } from "@/components/credentials-qr";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import {
+  ContactsRepositoryToken,
+  useRepos,
+} from "@/contexts/repository-context";
+import ContactsRepository from "@/repos/specs/contacts-repository";
 import { deserializeCredentialsFromQR } from "@/treekem/protocol";
 import { Credentials, SerializedCredentials } from "@/treekem/types";
+import { Mutex } from "@/utils/mutex";
 import { secureFetch } from "@/utils/secure-store";
 import { CameraView, useCameraPermissions } from "expo-camera";
-import React, { PropsWithChildren, useEffect, useState } from "react";
-import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import React, { PropsWithChildren, useEffect, useRef, useState } from "react";
+import { Alert, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 
 const CREDENTIALS_KEY = "treekem_credentials";
@@ -16,10 +22,14 @@ type Props = PropsWithChildren<{
 }>;
 
 export default function QRModal({ showQRModal, handleClose }: Props) {
+  const mutex = new Mutex();
   const [viewMode, setViewMode] = useState<"show" | "scan">("show");
   const [scannedData, setScannedData] = useState<string | null>(null);
   const [permission, requestPermission] = useCameraPermissions();
   const [credentials, setCredentials] = useState<Credentials | null>(null);
+  const { getRepo } = useRepos();
+  const contactsRepo = getRepo<ContactsRepository>(ContactsRepositoryToken);
+  const isProcessingRef = useRef(false);
 
   useEffect(() => {
     const loadCredentials = async () => {
@@ -43,16 +53,58 @@ export default function QRModal({ showQRModal, handleClose }: Props) {
     loadCredentials();
   }, []);
 
-  const handleBarCodeScanned = ({ data }: { data: string }) => {
+  const handleBarCodeScanned = async ({ data }: { data: string }) => {
+    // Prevent multiple scans
+    if (isProcessingRef.current) {
+      return;
+    }
+
+    isProcessingRef.current = true;
     setScannedData(data);
-    console.log("Scanned QR code");
-    // TODO: Parse and handle scanned credentials
-    const scannedCredentials = deserializeCredentialsFromQR(data);
-    console.log(scannedCredentials);
+
+    try {
+      const scannedCredentials = deserializeCredentialsFromQR(data);
+
+      console.log(scannedCredentials);
+
+      // Check if contact already exists
+      const exists = await contactsRepo.exists(
+        scannedCredentials.verificationKey,
+      );
+
+      if (exists) {
+        Alert.alert(
+          "Contact Exists",
+          `${scannedCredentials.pseudonym} is already in your contacts.`,
+          [{ text: "OK", onPress: () => setScannedData(null) }],
+        );
+        return;
+      }
+
+      // Save new contact
+      const contact = await contactsRepo.create(scannedCredentials);
+
+      Alert.alert(
+        "Contact Added",
+        `${contact.pseudonym} has been added to your contacts.`,
+        [{ text: "OK", onPress: () => setScannedData(null) }],
+      );
+
+      console.log("Contact saved:", contact);
+    } catch (error) {
+      console.error("Failed to save contact:", error);
+      Alert.alert("Error", "Failed to add contact. Please try again.", [
+        { text: "OK" },
+      ]);
+    } finally {
+      isProcessingRef.current = false;
+    }
   };
 
   const close = () => {
     setViewMode("show");
+    setScannedData(null);
+    isProcessingRef.current = false;
     handleClose();
   };
 
@@ -168,30 +220,29 @@ export default function QRModal({ showQRModal, handleClose }: Props) {
                       barcodeTypes: ["qr"],
                     }}
                   />
-                  {scannedData && (
-                    <View style={styles.scannedDataContainer}>
-                      <Text style={styles.scannedDataText}>
-                        QR Code Scanned!
-                      </Text>
-                      <Pressable
-                        style={styles.scanAgainButton}
-                        onPress={() => setScannedData(null)}
-                      >
-                        <Text style={styles.scanAgainButtonText}>
-                          Scan Again
-                        </Text>
-                      </Pressable>
-                    </View>
-                  )}
+                  <View style={styles.cameraOverlay}>
+                    <Text
+                      style={{
+                        color: "white",
+                        marginTop: 5,
+                        fontWeight: "500",
+                      }}
+                    >
+                      Scan the QR code on your contact&apos;s device
+                    </Text>
+                  </View>
                 </>
               )}
             </View>
           )}
 
-          <Text style={styles.qrText}>
-            Only share the QR code and link with people you trust. When shared,
-            others will be able to see your username and start a chat with you.
-          </Text>
+          {viewMode === "show" && (
+            <Text style={styles.qrText}>
+              Only share the QR code and link with people you trust. When
+              shared, others will be able to see your username and start a chat
+              with you.
+            </Text>
+          )}
         </SafeAreaView>
       </SafeAreaProvider>
     </Modal>
@@ -199,6 +250,12 @@ export default function QRModal({ showQRModal, handleClose }: Props) {
 }
 
 const styles = StyleSheet.create({
+  cameraOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    // justifyContent: "center",
+    alignItems: "center",
+    zIndex: 10,
+  },
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.95)",
@@ -265,7 +322,7 @@ const styles = StyleSheet.create({
   camera: {
     width: "100%",
     flex: 1,
-    maxHeight: 500,
+    maxHeight: "100%",
   },
   permissionContainer: {
     padding: 20,

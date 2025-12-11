@@ -13,7 +13,9 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 import { migrateDb } from "@/repos/db";
 import { Credentials, SerializedCredentials } from "@/treekem/types";
 import { ECDHKeyPair, SignatureMaterial } from "@/treekem/upke";
-import { generateRandomNameCapitalized } from "@/utils/names";
+import {
+  generateRandomName
+} from "@/utils/names";
 import { secureFetch, secureStore } from "@/utils/secure-store";
 import { Buffer } from "buffer";
 import * as SQLite from "expo-sqlite";
@@ -69,7 +71,7 @@ export default function RootLayout() {
 
         console.log("created signature");
 
-        const newPseudonym = generateRandomNameCapitalized();
+        const newPseudonym = generateRandomName();
 
         // Create credentials
         const creds: Credentials = {
