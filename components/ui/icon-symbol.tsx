@@ -26,6 +26,7 @@ const MAPPING = {
   qrcode: "qr-code",
   "x.circle": "close",
   "square.and.arrow.up": "ios-share",
+  "person.2": "group",
 } as IconMapping;
 
 /**

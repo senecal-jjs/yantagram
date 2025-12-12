@@ -13,9 +13,7 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 import { migrateDb } from "@/repos/db";
 import { Credentials, SerializedCredentials } from "@/treekem/types";
 import { ECDHKeyPair, SignatureMaterial } from "@/treekem/upke";
-import {
-  generateRandomName
-} from "@/utils/names";
+import { generateRandomName } from "@/utils/names";
 import { secureFetch, secureStore } from "@/utils/secure-store";
 import { Buffer } from "buffer";
 import * as SQLite from "expo-sqlite";
