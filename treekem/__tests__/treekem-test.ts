@@ -1,6 +1,6 @@
 import { Member } from "../member";
 import { Credentials } from "../types";
-import { RSAKeyPair, SignatureMaterial, SymmetricKey } from "../upke";
+import { ECDHKeyPair, SignatureMaterial, SymmetricKey } from "../upke";
 
 describe("TreeKEM Member Tests", () => {
   test("test_new_member", async () => {
@@ -10,18 +10,18 @@ describe("TreeKEM Member Tests", () => {
     // Testing valid pseudonym
     expect(member.pseudonym).toBe("bob");
 
-    // Testing valid RSA key material
+    // Testing valid ECDH key material
     const testMessage = new TextEncoder().encode(
       "Created a new member. Lets see!",
     );
 
-    const rsaKeyPair = new RSAKeyPair(
-      member.rsaPublicKey,
-      member.rsaPrivateKey,
+    const ecdhKeyPair = new ECDHKeyPair(
+      member.ecdhPublicKey,
+      member.ecdhPrivateKey,
     );
 
-    const encrypted = await rsaKeyPair.encrypt(testMessage);
-    const decryptedMessage = await rsaKeyPair.decrypt(encrypted);
+    const encrypted = await ecdhKeyPair.encrypt(testMessage);
+    const decryptedMessage = await ecdhKeyPair.decrypt(encrypted);
 
     expect(decryptedMessage).toEqual(testMessage);
 
@@ -47,13 +47,13 @@ describe("TreeKEM Member Tests", () => {
 
   test("test_credentials", async () => {
     // We want to test if a cred can be used to verify the identity of someone
-    const rsaMaterial = await RSAKeyPair.generate();
+    const ecdhMaterial = ECDHKeyPair.generate();
     const signingMaterial = SignatureMaterial.generate();
     const creds: Credentials = {
       verificationKey: signingMaterial.publicKey,
       pseudonym: "alice",
       signature: signingMaterial.sign(signingMaterial.publicKey),
-      rsaPublicKey: rsaMaterial.rsaPublicKey,
+      ecdhPublicKey: ecdhMaterial.publicKey,
     };
 
     expect(

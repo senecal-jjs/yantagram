@@ -6,14 +6,14 @@ export interface Credentials {
   verificationKey: Uint8Array;
   pseudonym: string;
   signature: Uint8Array;
-  rsaPublicKey: string;
+  ecdhPublicKey: Uint8Array;
 }
 
 export interface SerializedCredentials {
   verificationKey: string;
   pseudonym: string;
   signature: string;
-  rsaPublicKey: string;
+  ecdhPublicKey: string;
 }
 
 export interface SerializedTree {

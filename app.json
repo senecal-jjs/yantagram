@@ -20,7 +20,7 @@
 	      "NSMicrophoneUsageDescription": "bitchat uses the microphone to record voice notes that relay across the mesh.",
 	      "NSLocationWhenInUseUsageDescription": "bitchat uses your approximate location to compute local geohash channels for optional public chats. Exact GPS is never shared.",
 	      "UILaunchStoryboardName": "LaunchScreen",
-	      "UIRequiresFullScreen": true,
+	      "UIRequiresFullScreen": true
       }
     },
     "android": {
@@ -62,7 +62,15 @@
       ],
       "expo-sqlite",
       "expo-secure-store",
-      "expo-asset"
+      "expo-asset",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow $(PRODUCT_NAME) to access your camera",
+          "microphonePermission": "Allow $(PRODUCT_NAME) to access your microphone",
+          "recordAudioAndroid": true
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

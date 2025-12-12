@@ -324,7 +324,7 @@ export class BinaryTree {
         verificationKey: Buffer.from(creds.verificationKey).toString("base64"),
         pseudonym: creds.pseudonym,
         signature: Buffer.from(creds.signature).toString("base64"),
-        rsaPublicKey: creds.rsaPublicKey,
+        ecdhPublicKey: Buffer.from(creds.ecdhPublicKey).toString("base64"),
       });
     }
 
@@ -427,7 +427,10 @@ export class BinaryTree {
           ),
           pseudonym: serializedCredential.pseudonym,
           signature: Buffer.from(serializedCredential.signature, "base64"),
-          rsaPublicKey: serializedCredential.rsaPublicKey,
+          ecdhPublicKey: Buffer.from(
+            serializedCredential.ecdhPublicKey,
+            "base64",
+          ),
         };
         const node = tree.getNodeById(tree.height, id);
         if (node) {

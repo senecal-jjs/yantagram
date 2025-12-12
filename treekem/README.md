@@ -51,14 +51,16 @@ Required packages:
 {
   "@noble/curves": "^1.3.0",
   "@noble/hashes": "^1.3.3",
+  "@noble/ciphers": "^0.4.0",
   "expo-crypto": "~13.0.0"
 }
 ```
 
-**Note**: Some cryptographic operations require native implementations:
+**Note**: All cryptographic operations use pure JavaScript implementations from the @noble suite, eliminating the need for native modules.
 
-- **RSA encryption/decryption**: Requires `react-native-rsa-native` or similar
-- **AES-256-GCM**: Requires native crypto module or Web Crypto API polyfill
+- **X25519 ECDH**: Key agreement for welcome message encryption
+- **AES-256-GCM**: AEAD encryption using @noble/ciphers
+- **Ed25519/Ristretto255**: Signatures and UPKE operations
 
 ## Security Properties
 
@@ -113,19 +115,22 @@ const plaintext = await bob.decryptApplicationMessage(
 4. **JSON serialization**: Using JSON instead of serde for message encoding
 5. **Error handling**: Using exceptions instead of Result types
 
-### TODO: Native Crypto Integration
+### Cryptographic Implementation
 
-The following operations need native module integration:
+All cryptographic operations are implemented in pure JavaScript using @noble libraries:
 
-- [ ] RSA key generation (2048-bit)
-- [ ] RSA PKCS1v15 encryption/decryption
-- [ ] AES-256-GCM encryption/decryption
-- [ ] Secure random number generation (using `expo-crypto`)
+- ✅ X25519 ECDH key agreement (32-byte keys)
+- ✅ HKDF key derivation
+- ✅ AES-256-GCM AEAD encryption
+- ✅ Ed25519 signatures
+- ✅ Ristretto255 UPKE operations
+- ✅ Secure random number generation (using `expo-crypto`)
 
-Consider using:
-- `react-native-rsa-native` for RSA operations
-- `@react-native-community/webcrypto` for AES-GCM
-- `expo-crypto` for random bytes (already used)
+No native modules required! This provides:
+- Cross-platform compatibility
+- Smaller QR codes (32-byte EC keys vs 256+ byte RSA keys)
+- Faster cryptographic operations
+- Easier testing and debugging
 
 ## Testing
 

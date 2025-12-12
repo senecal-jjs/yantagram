@@ -14,10 +14,10 @@ import {
   WelcomeMessage,
 } from "./types";
 import {
+  ECDHKeyPair,
   NodeSecret,
   PathSecret,
   PublicKey,
-  RSAKeyPair,
   SecretKey,
   SignatureMaterial,
   SymmetricKey,
@@ -44,8 +44,8 @@ export class Group {
  */
 export class Member {
   pseudonym: string;
-  rsaPublicKey: string;
-  rsaPrivateKey: string;
+  ecdhPublicKey: Uint8Array;
+  ecdhPrivateKey: Uint8Array;
   groups: Map<string, Group>;
   id: number | null;
   credential: Credentials;
@@ -54,14 +54,14 @@ export class Member {
 
   private constructor(
     pseudonym: string,
-    rsaPublicKey: string,
-    rsaPrivateKey: string,
+    ecdhPublicKey: Uint8Array,
+    ecdhPrivateKey: Uint8Array,
     credential: Credentials,
     signingKey: Uint8Array,
   ) {
     this.pseudonym = pseudonym;
-    this.rsaPublicKey = rsaPublicKey;
-    this.rsaPrivateKey = rsaPrivateKey;
+    this.ecdhPublicKey = ecdhPublicKey;
+    this.ecdhPrivateKey = ecdhPrivateKey;
     this.groups = new Map();
     this.id = null;
     this.credential = credential;
@@ -73,19 +73,19 @@ export class Member {
    * Create a new member with generated key material
    */
   static async create(pseudonym: string): Promise<Member> {
-    const rsaKeyPair = await RSAKeyPair.generate();
+    const ecdhKeyPair = ECDHKeyPair.generate();
     const signingMaterial = SignatureMaterial.generate();
 
     const credential = Member.createCredential(
       signingMaterial,
       pseudonym,
-      rsaKeyPair.rsaPublicKey,
+      ecdhKeyPair.publicKey,
     );
 
     return new Member(
       pseudonym,
-      rsaKeyPair.rsaPublicKey,
-      rsaKeyPair.rsaPrivateKey,
+      ecdhKeyPair.publicKey,
+      ecdhKeyPair.privateKey,
       credential,
       signingMaterial.privateKey,
     );
@@ -97,7 +97,7 @@ export class Member {
   private static createCredential(
     signingMaterial: SignatureMaterial,
     pseudonym: string,
-    rsaPublicKey: string,
+    ecdhPublicKey: Uint8Array,
   ): Credentials {
     const signature = signingMaterial.sign(signingMaterial.publicKey);
 
@@ -105,7 +105,7 @@ export class Member {
       verificationKey: signingMaterial.publicKey,
       pseudonym,
       signature,
-      rsaPublicKey,
+      ecdhPublicKey,
     };
   }
 
@@ -268,9 +268,9 @@ export class Member {
     const nodeSecret = NodeSecret.derive(root.publicKey, root.privateKey);
     const key = SymmetricKey.derive(nodeSecret);
 
-    // Encrypt key with RSA
-    const rsaKeyPair = new RSAKeyPair(cred.rsaPublicKey, "");
-    const encryptedKey = await rsaKeyPair.encrypt(key);
+    // Encrypt key with ECDH
+    const ecdhKeyPair = new ECDHKeyPair(cred.ecdhPublicKey, new Uint8Array(32));
+    const encryptedKey = await ecdhKeyPair.encrypt(key);
 
     const treeInfo = await this.serialize(groupName, key, cred);
 
@@ -285,8 +285,11 @@ export class Member {
    */
   async joinGroup(welcomeMessage: WelcomeMessage): Promise<UpdateMessage> {
     // Decrypt symmetric key
-    const rsaKeyPair = new RSAKeyPair(this.rsaPublicKey, this.rsaPrivateKey);
-    const decryptedKey = await rsaKeyPair.decrypt(welcomeMessage.key);
+    const ecdhKeyPair = new ECDHKeyPair(
+      this.ecdhPublicKey,
+      this.ecdhPrivateKey,
+    );
+    const decryptedKey = await ecdhKeyPair.decrypt(welcomeMessage.key);
 
     // Decrypt tree
     const decryptedTree = SymmetricKey.decrypt(
@@ -541,7 +544,9 @@ export class Member {
         signature: new Uint8Array(
           Object.values(parsedMaterial.credentials.signature),
         ),
-        rsaPublicKey: parsedMaterial.credentials.rsaPublicKey,
+        ecdhPublicKey: new Uint8Array(
+          Object.values(parsedMaterial.credentials.ecdhPublicKey),
+        ),
       },
     };
 

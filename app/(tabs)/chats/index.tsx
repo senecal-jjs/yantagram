@@ -1,9 +1,10 @@
 import ConversationItem from "@/components/conversation";
+import QRModal from "@/components/qr-modal";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { Conversation } from "@/types/global";
 import { useRouter } from "expo-router";
-import React from "react";
-import { FlatList, StyleSheet, Text, View } from "react-native";
+import React, { useState } from "react";
+import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 
 const mockConversations = [
@@ -24,6 +25,11 @@ const mockConversations = [
 
 export default function TabTwoScreen() {
   const router = useRouter();
+  const [showQRModal, setShowQRModal] = useState(false);
+
+  const handleOpenModal = () => {
+    setShowQRModal(true);
+  };
 
   const renderItem = ({ item }: { item: Conversation }) => (
     <ConversationItem
@@ -41,7 +47,9 @@ export default function TabTwoScreen() {
     <SafeAreaProvider>
       <SafeAreaView style={styles.mainContainer}>
         <View style={styles.chatHeader}>
-          <View style={{ width: 28 }}></View>
+          <Pressable onPress={handleOpenModal}>
+            <IconSymbol size={28} name="qrcode" color={"white"}></IconSymbol>
+          </Pressable>
           <Text style={styles.headerText}>Chats</Text>
           <IconSymbol
             size={28}
@@ -54,6 +62,11 @@ export default function TabTwoScreen() {
           showsVerticalScrollIndicator={false}
           keyExtractor={(item) => item.id}
           renderItem={renderItem}
+        />
+
+        <QRModal
+          showQRModal={showQRModal}
+          handleClose={() => setShowQRModal(false)}
         />
       </SafeAreaView>
     </SafeAreaProvider>
@@ -70,6 +83,8 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 20,
+    padding: 15,
+    backgroundColor: "rgba(38, 35, 35, 0.2)",
   },
   headerText: {
     color: "white",

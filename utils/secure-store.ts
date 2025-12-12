@@ -14,4 +14,8 @@ const secureFetch = async (key: string): Promise<string> => {
   }
 };
 
-export { secureFetch, secureStore };
+const removeSecureStore = async (key: string) => {
+  SecureStore.deleteItemAsync(key);
+};
+
+export { removeSecureStore, secureFetch, secureStore };

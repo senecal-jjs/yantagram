@@ -3,21 +3,14 @@
  * Uses Ristretto255 (Curve25519), Ed25519, RSA, and AES-256-GCM
  */
 
-import { uint8ArrayToHexString } from "@/utils/string";
 import { gcm } from "@noble/ciphers/aes.js";
-import { ed25519, ristretto255 } from "@noble/curves/ed25519.js";
+import { ed25519, ristretto255, x25519 } from "@noble/curves/ed25519.js";
 import { hkdf } from "@noble/hashes/hkdf.js";
 import { sha256, sha512 } from "@noble/hashes/sha2.js";
 import { getRandomBytes } from "expo-crypto";
-// import { RSA } from "react-native-rsa-native";
-// @ts-ignore
-import { Crypt, RSA } from "hybrid-crypto-js";
 import { RistrettoPoint } from "./RistrettoPoint";
 import { Scalar } from "./scalar";
 import { Ciphertext } from "./types";
-
-// Note: For RSA operations, we'll need to use react-native-rsa-native or similar
-// For AES-GCM, we'll use expo-crypto or similar
 
 /**
  * Secret key in UPKE scheme (Scalar)
@@ -239,39 +232,80 @@ export class SignatureMaterial {
 /**
  * RSA key pair (placeholder - needs native implementation)
  */
-export class RSAKeyPair {
-  rsaPublicKey: string;
-  rsaPrivateKey: string;
-  crypt: any;
+export class ECDHKeyPair {
+  publicKey: Uint8Array;
+  privateKey: Uint8Array;
 
-  constructor(publicKey: string, privateKey: string) {
-    this.rsaPublicKey = publicKey;
-    this.rsaPrivateKey = privateKey;
-    this.crypt = new Crypt();
+  constructor(publicKey: Uint8Array, privateKey: Uint8Array) {
+    this.publicKey = publicKey;
+    this.privateKey = privateKey;
   }
 
-  static async generate(): Promise<RSAKeyPair> {
-    const rsa = new RSA({ keySize: 4096 });
-    const keypair = await rsa.generateKeyPairAsync();
-    return new RSAKeyPair(keypair.publicKey, keypair.privateKey);
+  static generate(): ECDHKeyPair {
+    // X25519 uses 32-byte keys
+    const privateKey = ed25519.utils.randomSecretKey();
+    const publicKey = x25519.getPublicKey(privateKey);
+    return new ECDHKeyPair(publicKey, privateKey);
   }
 
   async encrypt(data: Uint8Array): Promise<Uint8Array> {
-    const encoder = new TextEncoder();
-    const encrypted = this.crypt.encrypt(
-      this.rsaPublicKey,
-      uint8ArrayToHexString(data),
+    // Generate ephemeral keypair for ECDH
+    const ephemeralPrivate = ed25519.utils.randomSecretKey();
+    const ephemeralPublic = x25519.getPublicKey(ephemeralPrivate);
+
+    // Compute shared secret: ephemeralPrivate * theirPublic
+    const sharedSecret = x25519.getSharedSecret(
+      ephemeralPrivate,
+      this.publicKey,
     );
-    return encoder.encode(encrypted);
+
+    // Derive encryption key using HKDF
+    const key = hkdf(
+      sha256,
+      sharedSecret,
+      undefined,
+      new Uint8Array([0x01]),
+      32,
+    );
+
+    // Encrypt with AES-256-GCM
+    const nonce = getRandomBytes(12);
+    const aes = gcm(key, nonce);
+    const ciphertext = aes.encrypt(data);
+
+    // Return: ephemeralPublic || nonce || ciphertext
+    const result = new Uint8Array(32 + 12 + ciphertext.length);
+    result.set(ephemeralPublic, 0);
+    result.set(nonce, 32);
+    result.set(ciphertext, 44);
+
+    return result;
   }
 
-  async decrypt(ciphertext: Uint8Array): Promise<Uint8Array> {
-    // TODO: Implement RSA-PKCS1v15 decryption
-    const decoder = new TextDecoder();
-    const decoded = decoder.decode(ciphertext);
-    const decrypted = this.crypt.decrypt(this.rsaPrivateKey, decoded);
-    const buffer = Buffer.from(decrypted.message, "hex");
-    return new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+  async decrypt(encryptedData: Uint8Array): Promise<Uint8Array> {
+    // Parse: ephemeralPublic || nonce || ciphertext
+    const ephemeralPublic = encryptedData.slice(0, 32);
+    const nonce = encryptedData.slice(32, 44);
+    const ciphertext = encryptedData.slice(44);
+
+    // Compute shared secret: ourPrivate * ephemeralPublic
+    const sharedSecret = x25519.getSharedSecret(
+      this.privateKey,
+      ephemeralPublic,
+    );
+
+    // Derive decryption key
+    const key = hkdf(
+      sha256,
+      sharedSecret,
+      undefined,
+      new Uint8Array([0x01]),
+      32,
+    );
+
+    // Decrypt
+    const aes = gcm(key, nonce);
+    return aes.decrypt(ciphertext);
   }
 }
 
