@@ -1,5 +1,4 @@
 import { IconSymbol } from "@/components/ui/icon-symbol";
-import { useCredential } from "@/contexts/credential-context";
 import { useGroupCreation } from "@/contexts/group-creation-context";
 import { Member } from "@/treekem/member";
 import { secureFetch } from "@/utils/secure-store";
@@ -13,18 +12,22 @@ import {
   View,
 } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
+import {
+  CREDENTIALS_KEY
+} from "./_layout";
 
 export default function NameGroupScreen() {
   const router = useRouter();
   const { groupName, setGroupName, selectedMembers, reset } =
     useGroupCreation();
-  const { credentials } = useCredential();
 
   const handleClose = () => {
     router.back();
   };
 
   const handleCreate = async () => {
+    const credentials = await secureFetch(CREDENTIALS_KEY);
+
     if (!groupName.trim() || selectedMembers.length === 0 || !credentials) {
       console.error("Missing required data for group creation");
       return;

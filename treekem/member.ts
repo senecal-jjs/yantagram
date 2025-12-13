@@ -880,12 +880,28 @@ export class Member {
     const serializedGroups: [string, SerializedGroup][] = [];
 
     for (const [groupName, group] of this.groups.entries()) {
-      const serializedTree = group.ratchetTree.serialize(
-        groupName,
-        group.threshold,
-        group.admins,
-        this.credential,
+      const neighborId = group.ratchetTree.getLeftmostOpenLeaf(
+        group.ratchetTree.height,
       );
+
+      if (!neighborId || !this.id) throw new Error("Invalid state");
+
+      const ancestors = group.ratchetTree.getAncestorIds(this.id);
+      const neighborAncestors = group.ratchetTree.getAncestorIds(neighborId);
+
+      const { publicKeys, privateKeys, credentials } =
+        group.ratchetTree.serializeTree(this.id, ancestors, neighborAncestors);
+
+      const serializedTree: SerializedTree = {
+        groupName,
+        publicKeys: Array.from(publicKeys.entries()),
+        privateKeys: Array.from(privateKeys.entries()),
+        credentials: Array.from(credentials.entries()),
+        capacity: group.ratchetTree.capacity,
+        threshold: group.threshold,
+        admins: group.admins,
+        actionMemberCred: this.credential,
+      };
 
       const serializedGroup: SerializedGroup = {
         threshold: group.threshold,
@@ -946,7 +962,9 @@ export class Member {
 
     // Deserialize groups
     for (const [groupName, serializedGroup] of serialized.groups) {
-      const tree = BinaryTree.deserialize(serializedGroup.ratchetTree);
+      const tree = BinaryTree.deserializeTree(
+        serializedGroup.ratchetTree.publicKeys,
+      );
       const group = new Group(serializedGroup.threshold, tree);
       group.admins = [...serializedGroup.admins];
       member.groups.set(groupName, group);
