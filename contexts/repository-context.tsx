@@ -1,5 +1,7 @@
 import SQContactsRepository from "@/repos/impls/sq-contacts-repository";
 import SQFragmentsRepository from "@/repos/impls/sq-fragments-repository";
+import SQGroupMembersRepository from "@/repos/impls/sq-group-members-repository";
+import SQGroupsRepository from "@/repos/impls/sq-groups-repository";
 import SQMessagesRepository from "@/repos/impls/sq-messages-repository";
 import SQOutgoingMessagesRepository from "@/repos/impls/sq-outgoing-messages-repository";
 import Repository from "@/repos/specs/repository";
@@ -13,6 +15,8 @@ export const OutgoingMessagesRepositoryToken = Symbol(
   "OutgoingMessagesRepository",
 );
 export const ContactsRepositoryToken = Symbol("ContactsRepository");
+export const GroupsRepositoryToken = Symbol("GroupsRepository");
+export const GroupMembersRepositoryToken = Symbol("GroupMembersRepository");
 
 interface RepositoryContextType {
   repos: Map<symbol, Repository>;
@@ -37,6 +41,8 @@ export const RepositoryProvider: React.FC<{ children: React.ReactNode }> = ({
     new SQOutgoingMessagesRepository(db),
   );
   repos.set(ContactsRepositoryToken, new SQContactsRepository(db));
+  repos.set(GroupsRepositoryToken, new SQGroupsRepository(db));
+  repos.set(GroupMembersRepositoryToken, new SQGroupMembersRepository(db));
 
   function getRepo<T extends Repository>(token: symbol): T {
     const repo = repos.get(token);

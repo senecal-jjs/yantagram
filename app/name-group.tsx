@@ -1,6 +1,13 @@
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useCredentials } from "@/contexts/credential-context";
 import { useGroupCreation } from "@/contexts/group-creation-context";
+import {
+  GroupMembersRepositoryToken,
+  GroupsRepositoryToken,
+  useRepos,
+} from "@/contexts/repository-context";
+import { GroupMembersRepository } from "@/repos/specs/group-members-repository";
+import GroupsRepository from "@/repos/specs/groups-repository";
 import { useRouter } from "expo-router";
 import {
   FlatList,
@@ -17,6 +24,11 @@ export default function NameGroupScreen() {
   const { groupName, setGroupName, selectedMembers, reset } =
     useGroupCreation();
   const { member, saveMember } = useCredentials();
+  const { getRepo } = useRepos();
+  const groupMembersRepo = getRepo<GroupMembersRepository>(
+    GroupMembersRepositoryToken,
+  );
+  const groupsRepo = getRepo<GroupsRepository>(GroupsRepositoryToken);
 
   const handleClose = () => {
     router.back();
@@ -41,6 +53,12 @@ export default function NameGroupScreen() {
       // Save updated member state with new group
       await saveMember();
 
+      const group = await groupsRepo.create(groupName);
+
+      selectedMembers.forEach((selection) => {
+        groupMembersRepo.add(group.id, selection.id);
+      });
+
       // TODO: Store group state in database
       // TODO: Generate and send welcome messages to selected members
       // TODO: Each welcome message should contain:
@@ -58,7 +76,7 @@ export default function NameGroupScreen() {
         selectedMembers.map((m) => m.pseudonym),
       );
 
-      reset(); // Clear the context after creation
+      reset(); // Clear the group members context after creation
       router.navigate("/chats");
     } catch (error) {
       console.error("Failed to create group:", error);

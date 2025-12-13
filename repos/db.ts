@@ -90,6 +90,29 @@ async function migrateDb(db: SQLiteDatabase) {
       );
       
       CREATE INDEX idx_contacts_pseudonym ON contacts(pseudonym);
+
+      CREATE TABLE IF NOT EXISTS groups (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        last_active_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+        created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+        updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
+      );
+      
+      CREATE INDEX idx_groups_name ON groups(name);
+      CREATE INDEX idx_groups_last_active_at ON groups(last_active_at);
+
+      CREATE TABLE IF NOT EXISTS group_members (
+        group_id INTEGER NOT NULL,
+        contact_id INTEGER NOT NULL,
+        created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+        PRIMARY KEY (group_id, contact_id),
+        FOREIGN KEY (group_id) REFERENCES groups(id) ON DELETE CASCADE,
+        FOREIGN KEY (contact_id) REFERENCES contacts(id) ON DELETE CASCADE
+      );
+      
+      CREATE INDEX idx_group_members_group_id ON group_members(group_id);
+      CREATE INDEX idx_group_members_contact_id ON group_members(contact_id);
 `);
     currentDbVersion = 1;
   }
