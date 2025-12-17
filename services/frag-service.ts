@@ -6,8 +6,6 @@ import { getRandomBytes } from "expo-crypto";
 
 const fragmentPayload = (
   data: Uint8Array,
-  senderId: string,
-  recipientId: string,
   fragmentType: FragmentType,
 ): { fragmentId: Base64String; fragments: BitchatPacket[] } => {
   // create a random 8 byte fragment id
@@ -79,13 +77,9 @@ const fragmentPayload = (
     const packet: BitchatPacket = {
       version: 1,
       type: PacketType.FRAGMENT,
-      senderId,
-      recipientId,
       timestamp: Date.now(),
       payload,
-      signature: null,
       allowedHops: 3,
-      route: new Uint8Array(),
     };
 
     fragments.push(packet);

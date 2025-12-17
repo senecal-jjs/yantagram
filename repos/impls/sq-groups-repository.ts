@@ -10,8 +10,7 @@ class SQGroupsRepository implements GroupsRepository, Repository {
     this.db = database;
   }
 
-  async create(name: string): Promise<Group> {
-    const id = crypto.randomUUID();
+  async create(id: UUID, name: string): Promise<Group> {
     const statement = await this.db.prepareAsync(
       `INSERT INTO groups (id, name) VALUES ($id, $name)`,
     );

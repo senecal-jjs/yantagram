@@ -1,21 +1,16 @@
 import { useCredentials } from "@/contexts/credential-context";
 import {
   FragmentsRepositoryToken,
-  GroupsRepositoryToken,
   IncomingPacketsRepositoryToken,
   MessagesRepositoryToken,
-  OutgoingMessagesRepositoryToken,
   useRepos,
 } from "@/contexts/repository-context";
 import FragmentsRepository from "@/repos/specs/fragments-repository";
-import GroupsRepository from "@/repos/specs/groups-repository";
 import IncomingPacketsRepository from "@/repos/specs/incoming-packets-repository";
 import MessagesRepository from "@/repos/specs/messages-repository";
-import OutgoingMessagesRepository from "@/repos/specs/outgoing-messages-repository";
 import {
   AssembledData,
   extractFragmentMetadata,
-  fragmentPayload,
   reassembleFragments,
 } from "@/services/frag-service";
 import { fromBinaryPayload } from "@/services/message-protocol-service";
@@ -26,7 +21,7 @@ import {
   deserializeWelcomeMessage,
 } from "@/treekem/protocol";
 import { BitchatPacket, FragmentType, PacketType } from "@/types/global";
-import Constants from "expo-constants";
+import { useMessageSender } from "./use-message-sender";
 
 export function usePacketService() {
   const { getRepo } = useRepos();
@@ -36,14 +31,11 @@ export function usePacketService() {
   const fragmentsRepository = getRepo<FragmentsRepository>(
     FragmentsRepositoryToken,
   );
-  const outgoingMessagesRepository = getRepo<OutgoingMessagesRepository>(
-    OutgoingMessagesRepositoryToken,
-  );
-  const groupsRepository = getRepo<GroupsRepository>(GroupsRepositoryToken);
   const messagesRepository = getRepo<MessagesRepository>(
     MessagesRepositoryToken,
   );
   const { member, saveMember } = useCredentials();
+  const { sendAmigoPathUpdate } = useMessageSender();
 
   /**
    * Persists the raw packet of bytes for further processing. The packet will either be relayed on to
@@ -153,22 +145,6 @@ export function usePacketService() {
       }
 
       return assembledData;
-
-      // Attempt to decrypt the re-assembled packet. If decryption fails, the message is not meant for this device
-      // and must be forwarded on the mesh network.
-      // switch (metadata.packetType) {
-      //   case PacketType.AMIGO_WELCOME:
-      //     handleAmigoWelcome(assembledMessage);
-      //     fragmentsRepository.deleteByFragmentId(metadata.fragmentId);
-      //     break;
-      //   case PacketType.AMIGO_PATH_UPDATE:
-      //     break;
-      //   case PacketType.MESSAGE:
-      //     break;
-      //   default:
-      //     console.warn("Unknown packet type:", packet.type);
-      //     break;
-      // }
     }
 
     return null;
@@ -185,6 +161,7 @@ export function usePacketService() {
     // the message has reached its intended recipient.
     try {
       const pathUpdate = await member.joinGroup(welcome);
+      sendAmigoPathUpdate(pathUpdate.updateMessage);
       saveMember();
       // TODO(broadcast path update)
     } catch (error) {
@@ -247,33 +224,5 @@ export function usePacketService() {
     }
   };
 
-  const buildPackets = (
-    data: Uint8Array,
-    fragmentType: FragmentType,
-    packetType: PacketType,
-  ): BitchatPacket[] => {
-    if (
-      Constants.expoConfig?.extra &&
-      data.length >= Constants.expoConfig?.extra.ble.mtuLimitBytes
-    ) {
-      console.log(
-        `Message exceeds BLE MTU, fragmenting... [mtu: ${Constants.expoConfig.extra.ble.mtuLimitBytes}]`,
-      );
-
-      const { fragments } = fragmentPayload(data, "1", "1", fragmentType);
-      return fragments;
-    } else {
-      return [
-        {
-          version: 1,
-          type: packetType,
-          timestamp: Date.now(),
-          payload: data,
-          allowedHops: 3,
-        },
-      ];
-    }
-  };
-
-  return { handleIncomingPacket, processPacket, buildPackets };
+  return { handleIncomingPacket, processPacket };
 }

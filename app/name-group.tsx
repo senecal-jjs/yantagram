@@ -6,13 +6,12 @@ import {
   GroupsRepositoryToken,
   useRepos,
 } from "@/contexts/repository-context";
-import { useMessageService } from "@/hooks/use-message-service";
+import { useMessageSender } from "@/hooks/use-message-sender";
 import { Contact } from "@/repos/specs/contacts-repository";
 import { GroupMembersRepository } from "@/repos/specs/group-members-repository";
 import GroupsRepository from "@/repos/specs/groups-repository";
 import { Member } from "@/treekem/member";
-import { serializeWelcomeMessage } from "@/treekem/protocol";
-import { DeliveryStatus, Message } from "@/types/global";
+import { UUID } from "@/types/utility";
 import { randomUUID } from "expo-crypto";
 import { useRouter } from "expo-router";
 import {
@@ -35,7 +34,7 @@ export default function NameGroupScreen() {
     GroupMembersRepositoryToken,
   );
   const groupsRepo = getRepo<GroupsRepository>(GroupsRepositoryToken);
-  const { sendMessage } = useMessageService();
+  const { sendAmigoWelcome } = useMessageSender();
 
   const handleClose = () => {
     router.back();
@@ -51,29 +50,25 @@ export default function NameGroupScreen() {
       // Group capacity = creator + selected members
       const groupCapacity = selectedMembers.length + 1;
 
+      // group members will share this ID via the welcome message
+      // members of the group can give the group whatever name they want on their own device
+      const groupId = randomUUID();
+
       // Create the group with TreeKEM
-      member.createGroup(groupCapacity, groupName, 1);
+      member.createGroup(groupCapacity, groupId, 1);
 
       // Add creator to the group
-      await member.addToGroup(groupName);
+      await member.addToGroup(groupId);
 
       // Save updated member state with new group
       await saveMember();
 
-      const group = await groupsRepo.create(groupName);
+      const group = await groupsRepo.create(groupId, groupName);
 
       selectedMembers.forEach((selection) => {
         groupMembersRepo.add(group.id, selection.id);
-        sendWelcomeMessage(selection, member, groupName);
+        sendWelcomeMessage(selection, member, group.id);
       });
-
-      // TODO: Store group state in database
-      // TODO: Generate and send welcome messages to selected members
-      // TODO: Each welcome message should contain:
-      //   - Group configuration (name, threshold, capacity)
-      //   - Ratchet tree state
-      //   - Path secrets for the recipient
-      //   - Creator's credential
 
       console.log(
         "Group created:",
@@ -99,7 +94,7 @@ export default function NameGroupScreen() {
   const sendWelcomeMessage = async (
     contact: Contact,
     initiatingMember: Member,
-    groupName: string,
+    groupId: UUID,
   ) => {
     const welcomeMessage = await initiatingMember.sendWelcomeMessage(
       {
@@ -108,21 +103,9 @@ export default function NameGroupScreen() {
         signature: contact.signature,
         ecdhPublicKey: contact.ecdhPublicKey,
       },
-      groupName,
+      groupId,
     );
-    const payload = serializeWelcomeMessage(welcomeMessage);
-    const message: Message = {
-      id: randomUUID(),
-      sender: "1",
-      contents: payload,
-      timestamp: Date.now(),
-      isRelay: false,
-      originalSender: "1",
-      isPrivate: true,
-      recipientNickname: contact.pseudonym,
-      senderPeerId: "1",
-      deliveryStatus: DeliveryStatus.SENDING,
-    };
+    sendAmigoWelcome(welcomeMessage);
   };
 
   return (

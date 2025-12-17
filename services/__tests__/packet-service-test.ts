@@ -9,6 +9,7 @@ test("encode & decode packet", () => {
   const message: Message = {
     id: "1",
     sender: "2",
+    groupId: "5",
     contents: "Hello!",
     timestamp: Date.now(),
   };

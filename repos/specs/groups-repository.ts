@@ -9,7 +9,7 @@ export interface Group {
 }
 
 export default interface GroupsRepository {
-  create(name: string): Promise<Group>;
+  create(id: UUID, name: string): Promise<Group>;
   get(id: UUID): Promise<Group | null>;
   getByName(name: string): Promise<Group | null>;
   list(): Promise<Group[]>;

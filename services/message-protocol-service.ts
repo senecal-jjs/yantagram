@@ -42,6 +42,8 @@ import ByteArrayBuilder from "@/utils/byte-array-builder";
 // - Timestamp: 8 bytes (milliseconds since epoch)
 // - ID length: 1 byte
 // - ID: variable
+// - Group ID length: 1 byte
+// - Group ID: variable
 // - Sender length: 1 byte
 // - Sender: variable
 // - Content length: 2 bytes
@@ -59,6 +61,11 @@ const toBinaryPayload = (message: Message): Uint8Array | null => {
   const encodedId = textEncoder.encode(message.id);
   buffer.append(new Uint8Array([Math.min(encodedId.length, 255)]));
   buffer.append(encodedId.subarray(0, 255));
+
+  // Group ID field
+  const encodedGroupId = textEncoder.encode(message.groupId);
+  buffer.append(new Uint8Array([Math.min(encodedGroupId.length, 255)]));
+  buffer.append(encodedGroupId.subarray(0, 255));
 
   // Sender field
   const encodedSender = textEncoder.encode(message.sender);
@@ -80,10 +87,10 @@ const fromBinaryPayload = (data: Uint8Array): Message => {
   // Create a copy to prevent modification issues
   const dataCopy = new Uint8Array(data);
 
-  // Minimum required size: timestamp(8) + id_len(1) + sender_len(1) + content_len(2) = 12 bytes
-  if (dataCopy.length < 12) {
+  // Minimum required size: timestamp(8) + id_len(1) + group_id_len(1) + sender_len(1) + content_len(2) = 13 bytes
+  if (dataCopy.length < 13) {
     throw Error(
-      `Could not convert to Message from binary payload. Data does not meet minimum size. [minSize: 12, binarySize: ${dataCopy.length}]`,
+      `Could not convert to Message from binary payload. Data does not meet minimum size. [minSize: 13, binarySize: ${dataCopy.length}]`,
     );
   }
 
@@ -110,6 +117,16 @@ const fromBinaryPayload = (data: Uint8Array): Message => {
     crypto.randomUUID();
   offset += idLength;
 
+  // Parse group ID
+  if (offset >= dataCopy.length) throw Error("Offset exceed data length.");
+  const groupIdLength = dataCopy[offset++];
+  if (offset + groupIdLength > dataCopy.length)
+    throw Error("Offset exceed data length.");
+  const groupId =
+    textDecoder.decode(dataCopy.slice(offset, offset + groupIdLength)) ||
+    "default";
+  offset += groupIdLength;
+
   // Parse sender
   if (offset >= dataCopy.length) throw Error("Offset exceed data length.");
   const senderLength = dataCopy[offset++];
@@ -134,6 +151,7 @@ const fromBinaryPayload = (data: Uint8Array): Message => {
   // Create and return the Message object
   const message: Message = {
     id,
+    groupId,
     sender,
     contents,
     timestamp,

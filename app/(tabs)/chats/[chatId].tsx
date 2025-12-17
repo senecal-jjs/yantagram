@@ -16,7 +16,7 @@ import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 
 import { ChatBubble } from "@/components/chat-bubble";
 import { useGroupMessages } from "@/hooks/use-group-messages";
-import { useMessageService } from "@/hooks/use-message-service";
+import { useMessageSender } from "@/hooks/use-message-sender";
 import { Message } from "@/types/global";
 import { secureFetch } from "@/utils/secure-store";
 
@@ -27,7 +27,7 @@ export default function Chat() {
   const navigation = useNavigation();
   const { chatId } = useLocalSearchParams<{ chatId: string }>();
   const [peerId, setPeerId] = useState<string | null>(null);
-  const { sendMessage } = useMessageService();
+  const { sendMessage } = useMessageSender();
   const { messages, isLoading, isLoadingMore, hasMore, loadMore } =
     useGroupMessages(chatId);
   const flatListRef = useRef<FlatList>(null);
@@ -76,7 +76,7 @@ export default function Chat() {
       };
 
       setNewMessage("");
-      sendMessage(newMsg, peerId!, "to");
+      sendMessage(newMsg);
 
       // dismiss the keyboard after sending
       Keyboard.dismiss();
