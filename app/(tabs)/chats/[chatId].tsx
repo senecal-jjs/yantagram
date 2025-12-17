@@ -108,7 +108,7 @@ export default function Chat() {
           <FlatList
             ref={flatListRef}
             data={messages}
-            showsVerticalScrollIndicator={false}
+            showsVerticalScrollIndicator={true}
             renderItem={renderMessage}
             keyExtractor={(item) => item.id}
             onContentSizeChange={() => {
@@ -121,6 +121,7 @@ export default function Chat() {
             maintainVisibleContentPosition={{
               minIndexForVisible: 0,
             }}
+            contentContainerStyle={{ paddingRight: 5 }}
           />
 
           <View style={styles.inputContainer}>
