@@ -14,6 +14,7 @@ import { Member } from "@/treekem/member";
 import { UUID } from "@/types/utility";
 import { randomUUID } from "expo-crypto";
 import { useRouter } from "expo-router";
+import { useState } from "react";
 import {
   FlatList,
   Pressable,
@@ -22,10 +23,12 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { Wave } from "react-native-animated-spinkit";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 
 export default function NameGroupScreen() {
   const router = useRouter();
+  const [isProcessingGroup, setIsProcessingGroup] = useState(false);
   const { groupName, setGroupName, selectedMembers, reset } =
     useGroupCreation();
   const { member, saveMember } = useCredentials();
@@ -47,6 +50,8 @@ export default function NameGroupScreen() {
     }
 
     try {
+      setIsProcessingGroup(true);
+
       // Group capacity = creator + selected members
       const groupCapacity = selectedMembers.length + 1;
 
@@ -82,13 +87,13 @@ export default function NameGroupScreen() {
       reset(); // Clear the group members context after creation
 
       // Dismiss modals and navigate to chats tab, then to the new chat
-      // router.dismissAll();
       router.dismissTo({
         pathname: "/chats/[chatId]",
         params: { chatId: group.id },
       });
     } catch (error) {
       console.error("Failed to create group:", error);
+      setIsProcessingGroup(false);
       // TODO: Show error alert to user
     }
   };
@@ -113,77 +118,93 @@ export default function NameGroupScreen() {
   return (
     <SafeAreaProvider>
       <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <Pressable onPress={handleClose} style={styles.backButton}>
-            <IconSymbol size={25} name="chevron.left" color={"white"} />
-          </Pressable>
-          <Text style={styles.headerTitle}>Name Group</Text>
-          <Pressable onPress={handleCreate} disabled={!groupName.trim()}>
-            <Text
-              style={[
-                styles.createButton,
-                !groupName.trim() && styles.createButtonDisabled,
-              ]}
-            >
-              Create
-            </Text>
-          </Pressable>
-        </View>
-
-        <View style={styles.formContainer}>
-          <View style={styles.inputContainer}>
-            <View style={styles.avatarPlaceholder}>
-              <IconSymbol size={28} name="person.3.fill" color="#666" />
+        {!isProcessingGroup && (
+          <View>
+            <View style={styles.header}>
+              <Pressable onPress={handleClose} style={styles.backButton}>
+                <IconSymbol size={25} name="chevron.left" color={"white"} />
+              </Pressable>
+              <Text style={styles.headerTitle}>Name Group</Text>
+              <Pressable
+                onPress={handleCreate}
+                disabled={!groupName.trim() || isProcessingGroup}
+              >
+                <Text
+                  style={[
+                    styles.createButton,
+                    (!groupName.trim() || isProcessingGroup) &&
+                      styles.createButtonDisabled,
+                  ]}
+                >
+                  Create
+                </Text>
+              </Pressable>
             </View>
-            <TextInput
-              style={styles.input}
-              placeholder="Group Name (Required)"
-              placeholderTextColor="#666"
-              value={groupName}
-              onChangeText={setGroupName}
-              autoFocus
-              maxLength={50}
-            />
-          </View>
 
-          <View style={styles.membersSection}>
-            <Text style={styles.sectionTitle}>
-              Members ({selectedMembers.length})
-            </Text>
-            <View style={styles.membersContainer}>
-              <FlatList
-                data={selectedMembers}
-                keyExtractor={(item) => item.id.toString()}
-                scrollEnabled={false}
-                ItemSeparatorComponent={() => (
-                  <View style={styles.memberSeparator} />
-                )}
-                renderItem={({ item }) => (
-                  <View style={styles.memberItem}>
-                    <View style={styles.memberAvatar}>
-                      <Text style={styles.memberAvatarText}>
-                        {item.pseudonym.charAt(0).toUpperCase()}
-                      </Text>
-                    </View>
-                    <View style={styles.memberInfo}>
-                      <Text style={styles.memberName}>{item.pseudonym}</Text>
-                      <Text style={styles.memberKey} numberOfLines={1}>
-                        {item.verificationKey
-                          .slice(0, 8)
-                          .reduce(
-                            (acc, byte) =>
-                              acc + byte.toString(16).padStart(2, "0"),
-                            "",
-                          )}
-                        ...
-                      </Text>
-                    </View>
-                  </View>
-                )}
-              />
+            <View style={styles.formContainer}>
+              <View style={styles.inputContainer}>
+                <View style={styles.avatarPlaceholder}>
+                  <IconSymbol size={28} name="person.3.fill" color="#666" />
+                </View>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Group Name (Required)"
+                  placeholderTextColor="#666"
+                  value={groupName}
+                  onChangeText={setGroupName}
+                  autoFocus
+                  maxLength={50}
+                  editable={!isProcessingGroup}
+                />
+              </View>
+
+              <View style={styles.membersSection}>
+                <Text style={styles.sectionTitle}>
+                  Members ({selectedMembers.length})
+                </Text>
+                <View style={styles.membersContainer}>
+                  <FlatList
+                    data={selectedMembers}
+                    keyExtractor={(item) => item.id.toString()}
+                    scrollEnabled={false}
+                    ItemSeparatorComponent={() => (
+                      <View style={styles.memberSeparator} />
+                    )}
+                    renderItem={({ item }) => (
+                      <View style={styles.memberItem}>
+                        <View style={styles.memberAvatar}>
+                          <Text style={styles.memberAvatarText}>
+                            {item.pseudonym.charAt(0).toUpperCase()}
+                          </Text>
+                        </View>
+                        <View style={styles.memberInfo}>
+                          <Text style={styles.memberName}>
+                            {item.pseudonym}
+                          </Text>
+                          <Text style={styles.memberKey} numberOfLines={1}>
+                            {item.verificationKey
+                              .slice(0, 8)
+                              .reduce(
+                                (acc, byte) =>
+                                  acc + byte.toString(16).padStart(2, "0"),
+                                "",
+                              )}
+                            ...
+                          </Text>
+                        </View>
+                      </View>
+                    )}
+                  />
+                </View>
+              </View>
             </View>
           </View>
-        </View>
+        )}
+        {isProcessingGroup && (
+          <View style={styles.spinnerOverlay}>
+            <Wave size={48} color="#FFF"></Wave>
+          </View>
+        )}
       </SafeAreaView>
     </SafeAreaProvider>
   );
@@ -301,5 +322,14 @@ const styles = StyleSheet.create({
     color: "#666",
     fontSize: 12,
     fontFamily: "monospace",
+  },
+  spinnerOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: "center",
+    alignItems: "center",
   },
 });

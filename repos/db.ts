@@ -55,7 +55,7 @@ async function migrateDb(db: SQLiteDatabase) {
         timestamp INTEGER NOT NULL,
         payload BLOB NOT NULL,
         allowed_hops INTEGER NOT NULL,
-        created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
+        created_at INTEGER NOT NULL DEFAULT (round(unixepoch('subsec') * 1000))
       );
       
       CREATE INDEX idx_fragments_fragment_id ON fragments(fragment_id);
@@ -66,7 +66,7 @@ async function migrateDb(db: SQLiteDatabase) {
         contents TEXT NOT NULL,
         timestamp INTEGER NOT NULL,
         group_id TEXT,
-        created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+        created_at INTEGER NOT NULL DEFAULT (round(unixepoch('subsec') * 1000)),
         FOREIGN KEY (group_id) REFERENCES groups(id) ON DELETE CASCADE
       );
 
@@ -77,8 +77,8 @@ async function migrateDb(db: SQLiteDatabase) {
         signature string NOT NULL,
         ecdh_public_key string NOT NULL,
         verified_oob INTEGER NOT NULL DEFAULT 0,
-        created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
-        updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+        created_at INTEGER NOT NULL DEFAULT (round(unixepoch('subsec') * 1000)),
+        updated_at INTEGER NOT NULL DEFAULT (round(unixepoch('subsec') * 1000)),
         UNIQUE(verification_key)
       );
       
@@ -87,9 +87,9 @@ async function migrateDb(db: SQLiteDatabase) {
       CREATE TABLE IF NOT EXISTS groups (
         id TEXT PRIMARY KEY NOT NULL,
         name TEXT NOT NULL,
-        last_active_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
-        created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000),
-        updated_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+        last_active_at INTEGER NOT NULL DEFAULT (round(unixepoch('subsec') * 1000)),
+        created_at INTEGER NOT NULL DEFAULT (round(unixepoch('subsec') * 1000)),
+        updated_at INTEGER NOT NULL DEFAULT (round(unixepoch('subsec') * 1000))
       );
       
       CREATE INDEX idx_groups_name ON groups(name);
@@ -98,7 +98,7 @@ async function migrateDb(db: SQLiteDatabase) {
       CREATE TABLE IF NOT EXISTS group_members (
         group_id TEXT NOT NULL,
         contact_id INTEGER NOT NULL,
-        created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+        created_at INTEGER NOT NULL DEFAULT (round(unixepoch('subsec') * 1000)),
         PRIMARY KEY (group_id, contact_id),
         FOREIGN KEY (group_id) REFERENCES groups(id) ON DELETE CASCADE,
         FOREIGN KEY (contact_id) REFERENCES contacts(id) ON DELETE CASCADE
@@ -114,7 +114,7 @@ async function migrateDb(db: SQLiteDatabase) {
         timestamp INTEGER NOT NULL,
         payload BLOB NOT NULL,
         allowed_hops INTEGER NOT NULL,
-        created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
+        created_at INTEGER NOT NULL DEFAULT (round(unixepoch('subsec') * 1000))
       );
       
       CREATE INDEX idx_incoming_packets_timestamp ON incoming_packets(timestamp);
@@ -132,7 +132,7 @@ async function migrateDb(db: SQLiteDatabase) {
         signature TEXT,
         allowed_hops INTEGER NOT NULL,
         route BLOB NOT NULL,
-        created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
+        created_at INTEGER NOT NULL DEFAULT (round(unixepoch('subsec') * 1000))
       );
       
       CREATE INDEX idx_relay_packets_timestamp ON relay_packets(timestamp);
