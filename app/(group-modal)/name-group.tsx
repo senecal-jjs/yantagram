@@ -87,7 +87,6 @@ export default function NameGroupScreen() {
       reset(); // Clear the group members context after creation
 
       // Dismiss modals and navigate to chats tab, then to the new chat
-      // router.dismissAll();
       router.dismissTo({
         pathname: "/chats/[chatId]",
         params: { chatId: group.id },
@@ -330,7 +329,6 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    // backgroundColor: "rgba(96, 28, 28, 0.7)",
     justifyContent: "center",
     alignItems: "center",
   },
