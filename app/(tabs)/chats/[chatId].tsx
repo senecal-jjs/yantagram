@@ -16,10 +16,15 @@ import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 
 import { ChatBubble } from "@/components/chat-bubble";
 import { useCredential } from "@/contexts/credential-context";
-import { GroupsRepositoryToken, useRepos } from "@/contexts/repository-context";
+import {
+  GroupsRepositoryToken,
+  MessagesRepositoryToken,
+  useRepos,
+} from "@/contexts/repository-context";
 import { useGroupMessages } from "@/hooks/use-group-messages";
 import { useMessageSender } from "@/hooks/use-message-sender";
 import GroupsRepository from "@/repos/specs/groups-repository";
+import MessagesRepository from "@/repos/specs/messages-repository";
 import { Message } from "@/types/global";
 import { uint8ArrayToHexString } from "@/utils/string";
 
@@ -32,6 +37,7 @@ export default function Chat() {
     useGroupMessages(chatId);
   const { getRepo } = useRepos();
   const groupsRepo = getRepo<GroupsRepository>(GroupsRepositoryToken);
+  const messagesRepo = getRepo<MessagesRepository>(MessagesRepositoryToken);
   const flatListRef = useRef<FlatList>(null);
 
   useEffect(() => {
@@ -39,7 +45,7 @@ export default function Chat() {
       const group = await groupsRepo.get(chatId);
 
       navigation.setOptions({
-        title: group?.name ?? "Uknown Group",
+        title: group?.name ?? "Unknown Group",
       });
     }
 
@@ -47,6 +53,7 @@ export default function Chat() {
   });
 
   const renderMessage = ({ item }: { item: Message }) => {
+    messagesRepo.markAsRead(item.id);
     return (
       <ChatBubble
         message={item}

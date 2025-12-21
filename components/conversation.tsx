@@ -1,4 +1,4 @@
-import { Conversation } from "@/types/global";
+import { Conversation } from "@/app/(tabs)/chats";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 const ConversationItem = ({
@@ -10,6 +10,7 @@ const ConversationItem = ({
 }) => {
   return (
     <Pressable style={styles.item} onPress={onPress}>
+      {conversation.hasUnread && <View style={styles.unreadDot} />}
       <View style={styles.content}>
         <Text style={styles.name}>{conversation.name}</Text>
         <Text style={styles.lastMessage} numberOfLines={1}>
@@ -42,6 +43,13 @@ const styles = StyleSheet.create({
   timestamp: {
     fontSize: 12,
     color: "#aaa",
+  },
+  unreadDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#007AFF",
+    marginRight: 12,
   },
 });
 

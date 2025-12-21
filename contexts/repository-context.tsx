@@ -37,23 +37,25 @@ export const RepositoryProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
   const db = useSQLiteContext();
-  const repos = new Map<symbol, Repository>();
-
-  // Initialize all repositories
-  repos.set(MessagesRepositoryToken, new SQMessagesRepository(db));
-  repos.set(FragmentsRepositoryToken, new SQFragmentsRepository(db));
-  repos.set(
-    OutgoingMessagesRepositoryToken,
-    new SQOutgoingMessagesRepository(db),
-  );
-  repos.set(ContactsRepositoryToken, new SQContactsRepository(db));
-  repos.set(GroupsRepositoryToken, new SQGroupsRepository(db));
-  repos.set(GroupMembersRepositoryToken, new SQGroupMembersRepository(db));
-  repos.set(
-    IncomingPacketsRepositoryToken,
-    new SQIncomingPacketsRepository(db),
-  );
-  repos.set(RelayPacketsRepositoryToken, new SQRelayPacketsRepository(db));
+  const repos = React.useMemo(() => {
+    const repoMap = new Map<symbol, Repository>();
+    // Initialize all repositories
+    repoMap.set(MessagesRepositoryToken, new SQMessagesRepository(db));
+    repoMap.set(FragmentsRepositoryToken, new SQFragmentsRepository(db));
+    repoMap.set(
+      OutgoingMessagesRepositoryToken,
+      new SQOutgoingMessagesRepository(db),
+    );
+    repoMap.set(ContactsRepositoryToken, new SQContactsRepository(db));
+    repoMap.set(GroupsRepositoryToken, new SQGroupsRepository(db));
+    repoMap.set(GroupMembersRepositoryToken, new SQGroupMembersRepository(db));
+    repoMap.set(
+      IncomingPacketsRepositoryToken,
+      new SQIncomingPacketsRepository(db),
+    );
+    repoMap.set(RelayPacketsRepositoryToken, new SQRelayPacketsRepository(db));
+    return repoMap;
+  }, [db]);
 
   function getRepo<T extends Repository>(token: symbol): T {
     const repo = repos.get(token);

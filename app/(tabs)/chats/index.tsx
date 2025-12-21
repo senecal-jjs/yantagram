@@ -14,10 +14,11 @@ import React, { useEffect, useState } from "react";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 
-type Conversation = {
+export type Conversation = {
   id: string;
   name: string;
   lastMessage: string;
+  hasUnread: boolean;
   timestamp: string;
 };
 
@@ -36,6 +37,7 @@ export default function TabTwoScreen() {
       console.log("building conversations");
       // Get last message for this group
       const lastMessageData = await messagesRepo.getByGroupId(group.id, 1, 0);
+      const hasUnread = await messagesRepo.hasUnreadInGroup(group.id);
 
       let lastMessage = "";
       let timestamp = "";
@@ -52,6 +54,7 @@ export default function TabTwoScreen() {
         id: group.id,
         name: group.name,
         lastMessage,
+        hasUnread,
         timestamp,
       };
     });
@@ -65,12 +68,14 @@ export default function TabTwoScreen() {
 
     // Listen for group creation events
     dbListener.onGroupCreation(fetchConversations);
-    dbListener.onMessageChange(fetchConversations);
     dbListener.onGroupUpdate(fetchConversations);
+    dbListener.onMessageChange(fetchConversations);
 
     // Cleanup listener on unmount
     return () => {
-      dbListener.removeAllListeners();
+      dbListener.removeGroupCreationListener(fetchConversations);
+      dbListener.removeGroupUpdateListener(fetchConversations);
+      dbListener.removeMessageChangeListener(fetchConversations);
     };
   }, []);
 

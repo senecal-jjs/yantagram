@@ -10,6 +10,8 @@ import { useMessageSender } from "@/hooks/use-message-sender";
 import { Contact } from "@/repos/specs/contacts-repository";
 import { GroupMembersRepository } from "@/repos/specs/group-members-repository";
 import GroupsRepository from "@/repos/specs/groups-repository";
+import { Member } from "@/treekem/member";
+import { UUID } from "@/types/utility";
 import { randomUUID } from "expo-crypto";
 import { useRouter } from "expo-router";
 import { useState } from "react";
@@ -59,6 +61,8 @@ export default function StartMessageScreen() {
 
       const group = await groupsRepo.create(groupId, contact.pseudonym);
 
+      sendWelcomeMessage(contact, member, group.id);
+
       console.log("Group created");
 
       // Dismiss modals and navigate to chats tab, then to the new chat
@@ -70,6 +74,23 @@ export default function StartMessageScreen() {
       console.error("Failed to create group:", error);
       setIsProcessingGroup(false);
     }
+  };
+
+  const sendWelcomeMessage = async (
+    contact: Contact,
+    initiatingMember: Member,
+    groupId: UUID,
+  ) => {
+    const welcomeMessage = await initiatingMember.sendWelcomeMessage(
+      {
+        verificationKey: contact.verificationKey,
+        pseudonym: contact.pseudonym,
+        signature: contact.signature,
+        ecdhPublicKey: contact.ecdhPublicKey,
+      },
+      groupId,
+    );
+    sendAmigoWelcome(welcomeMessage);
   };
 
   const handleNewGroupPress = () => {

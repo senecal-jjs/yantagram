@@ -7,7 +7,13 @@ import { UUID } from "@/types/utility";
  * Group conversations are constructed from this repository.
  */
 export default interface MessagesRepository {
-  create(message: Message): Promise<Message>;
+  create(
+    id: string,
+    groupId: string,
+    sender: string,
+    contents: string,
+    timestamp: number,
+  ): Promise<Message>;
   get(id: UUID): Promise<Message>;
   getAll(limit: number): Promise<Message[]>;
   getByGroupId(
@@ -16,4 +22,7 @@ export default interface MessagesRepository {
     offset?: number,
   ): Promise<Message[]>;
   exists(id: UUID): Promise<boolean>;
+  markGroupAsRead(groupId: UUID): Promise<void>;
+  markAsRead(id: UUID): Promise<void>;
+  hasUnreadInGroup(groupId: UUID): Promise<boolean>;
 }
