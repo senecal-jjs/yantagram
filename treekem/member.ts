@@ -143,6 +143,7 @@ export class Member {
       const welcomeMessage = await synchronizedGroup[count].sendWelcomeMessage(
         joiningMember.credential,
         groupName,
+        "test",
       );
       const pathUpdateMessage = await joiningMember.joinGroup(welcomeMessage);
 
@@ -261,10 +262,11 @@ export class Member {
    */
   async sendWelcomeMessage(
     cred: Credentials,
+    groupId: string,
     groupName: string,
   ): Promise<WelcomeMessage> {
-    const group = this.groups.get(groupName);
-    if (!group) throw new Error(`Group ${groupName} not found`);
+    const group = this.groups.get(groupId);
+    if (!group) throw new Error(`Group ${groupId} not found`);
 
     const root = group.ratchetTree.getNodeById(group.ratchetTree.height, 1);
     if (!root || !root.publicKey || !root.privateKey) {
@@ -278,12 +280,43 @@ export class Member {
     const ecdhKeyPair = new ECDHKeyPair(cred.ecdhPublicKey, new Uint8Array(32));
     const encryptedKey = await ecdhKeyPair.encrypt(key);
 
-    const treeInfo = await this.serialize(groupName, key, cred);
+    const treeInfo = await this.serialize(groupId, key, cred);
+
+    const textEncoder = new TextEncoder();
+    const encryptedGroupName = SymmetricKey.encrypt(
+      textEncoder.encode(groupName),
+      key,
+    );
 
     return {
       key: encryptedKey,
       updateMessage: treeInfo,
+      groupPseudonym: {
+        cipherText: encryptedGroupName.ciphertext,
+        nonce: encryptedGroupName.nonce,
+      },
     };
+  }
+
+  /**
+   * Get group pseudonym from welcome message
+   */
+  async getGroupPseudonym(welcomeMessage: WelcomeMessage): Promise<string> {
+    // Decrypt symmetric key
+    const ecdhKeyPair = new ECDHKeyPair(
+      this.ecdhPublicKey,
+      this.ecdhPrivateKey,
+    );
+
+    const decryptedKey = await ecdhKeyPair.decrypt(welcomeMessage.key);
+
+    const nameBytes = SymmetricKey.decrypt(
+      welcomeMessage.groupPseudonym.cipherText,
+      decryptedKey,
+      welcomeMessage.groupPseudonym.nonce,
+    );
+
+    return new TextDecoder().decode(nameBytes);
   }
 
   /**
@@ -520,7 +553,7 @@ export class Member {
     pathUpdateMessage: Uint8Array,
     nonce: Uint8Array,
     groupName: string,
-  ): Promise<void> {
+  ): Promise<UpdateMaterial> {
     const group = this.groups.get(groupName);
     if (!group) throw new Error(`Group ${groupName} not found`);
 
@@ -627,6 +660,8 @@ export class Member {
       );
       updatingNodeObj.credential = updateMaterial.credentials;
     }
+
+    return updateMaterial;
   }
 
   /**

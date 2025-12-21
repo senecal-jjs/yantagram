@@ -11,6 +11,7 @@ const ConversationItem = ({
   return (
     <Pressable style={styles.item} onPress={onPress}>
       {conversation.hasUnread && <View style={styles.unreadDot} />}
+      {!conversation.hasUnread && <View style={styles.readDot} />}
       <View style={styles.content}>
         <Text style={styles.name}>{conversation.name}</Text>
         <Text style={styles.lastMessage} numberOfLines={1}>
@@ -49,6 +50,13 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: 4,
     backgroundColor: "#007AFF",
+    marginRight: 12,
+  },
+  readDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#090909ff",
     marginRight: 12,
   },
 });

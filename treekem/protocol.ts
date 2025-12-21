@@ -223,6 +223,26 @@ export function serializeWelcomeMessage(
   builder.append(nonceLength);
   builder.append(welcomeMessage.updateMessage.nonce);
 
+  // Serialize groupPseudonym.cipherText
+  const groupCipherTextLength = new Uint8Array(4);
+  new DataView(groupCipherTextLength.buffer).setUint32(
+    0,
+    welcomeMessage.groupPseudonym.cipherText.length,
+    false,
+  );
+  builder.append(groupCipherTextLength);
+  builder.append(welcomeMessage.groupPseudonym.cipherText);
+
+  // Serialize groupPseudonym.nonce
+  const groupNonceLength = new Uint8Array(4);
+  new DataView(groupNonceLength.buffer).setUint32(
+    0,
+    welcomeMessage.groupPseudonym.nonce.length,
+    false,
+  );
+  builder.append(groupNonceLength);
+  builder.append(welcomeMessage.groupPseudonym.nonce);
+
   return builder.build();
 }
 
@@ -249,12 +269,28 @@ export function deserializeWelcomeMessage(data: Uint8Array): WelcomeMessage {
   const nonceLength = view.getUint32(offset, false);
   offset += 4;
   const nonce = data.slice(offset, offset + nonceLength);
+  offset += nonceLength;
+
+  // Deserialize groupPseudonym.cipherText
+  const groupCipherTextLength = view.getUint32(offset, false);
+  offset += 4;
+  const groupCipherText = data.slice(offset, offset + groupCipherTextLength);
+  offset += groupCipherTextLength;
+
+  // Deserialize groupPseudonym.nonce
+  const groupNonceLength = view.getUint32(offset, false);
+  offset += 4;
+  const groupNonce = data.slice(offset, offset + groupNonceLength);
 
   return {
     key,
     updateMessage: {
       ciphertext,
       nonce,
+    },
+    groupPseudonym: {
+      cipherText: groupCipherText,
+      nonce: groupNonce,
     },
   };
 }

@@ -20,6 +20,7 @@ export type Conversation = {
   lastMessage: string;
   hasUnread: boolean;
   timestamp: string;
+  rawTimestamp: number;
 };
 
 export default function TabTwoScreen() {
@@ -41,13 +42,16 @@ export default function TabTwoScreen() {
 
       let lastMessage = "";
       let timestamp = "";
+      let rawTimestamp = 0;
 
       if (lastMessageData.length > 0) {
         lastMessage = lastMessageData[0].contents;
-        timestamp = formatTimestamp(lastMessageData[0].timestamp);
+        rawTimestamp = lastMessageData[0].timestamp;
+        timestamp = formatTimestamp(rawTimestamp);
       } else {
-        lastMessage = "No messages yet";
-        timestamp = formatTimestamp(group.createdAt);
+        lastMessage = "You've been added to a group";
+        rawTimestamp = group.createdAt;
+        timestamp = formatTimestamp(rawTimestamp);
       }
 
       return {
@@ -56,10 +60,13 @@ export default function TabTwoScreen() {
         lastMessage,
         hasUnread,
         timestamp,
+        rawTimestamp,
       };
     });
 
-    const fetchedConversations = await Promise.all(conversationPromises);
+    const fetchedConversations = (await Promise.all(conversationPromises)).sort(
+      (a, b) => b.rawTimestamp - a.rawTimestamp,
+    );
     setConversations(fetchedConversations);
   };
 
