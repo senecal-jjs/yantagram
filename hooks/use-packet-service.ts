@@ -193,10 +193,7 @@ export function usePacketService() {
       // try {
       const pathUpdate = await member.joinGroup(welcome);
 
-      // check if we recognize any members of the group as contacts
-      const groupName = pathUpdate.treeInfo.credentials
-        .map((cred) => cred[1].pseudonym)
-        .join(", ");
+      const groupName = await member.getGroupPseudonym(welcome);
 
       // group name off of tree info is an immutable unique uuid identifier for the group
       // the local group name variable can be changed at will by the user to identify the group on their device

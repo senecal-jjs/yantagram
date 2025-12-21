@@ -72,7 +72,7 @@ export default function NameGroupScreen() {
 
       selectedMembers.forEach((selection) => {
         groupMembersRepo.add(group.id, selection.id);
-        sendWelcomeMessage(selection, member, group.id);
+        sendWelcomeMessage(selection, member, group.id, groupName);
       });
 
       console.log(
@@ -102,6 +102,7 @@ export default function NameGroupScreen() {
     contact: Contact,
     initiatingMember: Member,
     groupId: UUID,
+    groupName: string,
   ) => {
     const welcomeMessage = await initiatingMember.sendWelcomeMessage(
       {
@@ -111,6 +112,7 @@ export default function NameGroupScreen() {
         ecdhPublicKey: contact.ecdhPublicKey,
       },
       groupId,
+      groupName,
     );
     sendAmigoWelcome(welcomeMessage);
   };

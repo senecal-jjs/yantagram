@@ -35,6 +35,10 @@ export interface UpdateMessage {
 export interface WelcomeMessage {
   key: Uint8Array;
   updateMessage: UpdateMessage;
+  groupPseudonym: {
+    cipherText: Uint8Array;
+    nonce: Uint8Array;
+  };
 }
 
 export interface UpdateMaterial {
