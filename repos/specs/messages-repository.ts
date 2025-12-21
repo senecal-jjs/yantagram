@@ -1,4 +1,4 @@
-import { Message } from "@/types/global";
+import { Message, MessageWithPseudonym } from "@/types/global";
 import { UUID } from "@/types/utility";
 
 /**
@@ -20,9 +20,9 @@ export default interface MessagesRepository {
     groupId: string,
     limit: number,
     offset?: number,
-  ): Promise<Message[]>;
+  ): Promise<MessageWithPseudonym[]>;
   exists(id: UUID): Promise<boolean>;
-  markGroupAsRead(groupId: UUID): Promise<void>;
-  markAsRead(id: UUID): Promise<void>;
+  markGroupAsRead(groupId: UUID, notifyListener: boolean): Promise<void>;
+  markAsRead(id: UUID, notifyListener: boolean): Promise<void>;
   hasUnreadInGroup(groupId: UUID): Promise<boolean>;
 }

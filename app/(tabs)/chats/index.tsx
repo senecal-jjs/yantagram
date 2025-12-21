@@ -9,8 +9,8 @@ import {
 import { dbListener } from "@/repos/db-listener";
 import GroupsRepository from "@/repos/specs/groups-repository";
 import MessagesRepository from "@/repos/specs/messages-repository";
-import { useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
+import { useFocusEffect, useRouter } from "expo-router";
+import React, { useCallback, useEffect, useState } from "react";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 
@@ -30,61 +30,6 @@ export default function TabTwoScreen() {
   const { getRepo } = useRepos();
   const groupsRepo = getRepo<GroupsRepository>(GroupsRepositoryToken);
   const messagesRepo = getRepo<MessagesRepository>(MessagesRepositoryToken);
-
-  const fetchConversations = async () => {
-    const groups = await groupsRepo.list();
-
-    const conversationPromises = groups.map(async (group) => {
-      console.log("building conversations");
-      // Get last message for this group
-      const lastMessageData = await messagesRepo.getByGroupId(group.id, 1, 0);
-      const hasUnread = await messagesRepo.hasUnreadInGroup(group.id);
-
-      let lastMessage = "";
-      let timestamp = "";
-      let rawTimestamp = 0;
-
-      if (lastMessageData.length > 0) {
-        lastMessage = lastMessageData[0].contents;
-        rawTimestamp = lastMessageData[0].timestamp;
-        timestamp = formatTimestamp(rawTimestamp);
-      } else {
-        lastMessage = "You've been added to a group";
-        rawTimestamp = group.createdAt;
-        timestamp = formatTimestamp(rawTimestamp);
-      }
-
-      return {
-        id: group.id,
-        name: group.name,
-        lastMessage,
-        hasUnread,
-        timestamp,
-        rawTimestamp,
-      };
-    });
-
-    const fetchedConversations = (await Promise.all(conversationPromises)).sort(
-      (a, b) => b.rawTimestamp - a.rawTimestamp,
-    );
-    setConversations(fetchedConversations);
-  };
-
-  useEffect(() => {
-    fetchConversations();
-
-    // Listen for group creation events
-    dbListener.onGroupCreation(fetchConversations);
-    dbListener.onGroupUpdate(fetchConversations);
-    dbListener.onMessageChange(fetchConversations);
-
-    // Cleanup listener on unmount
-    return () => {
-      dbListener.removeGroupCreationListener(fetchConversations);
-      dbListener.removeGroupUpdateListener(fetchConversations);
-      dbListener.removeMessageChangeListener(fetchConversations);
-    };
-  }, []);
 
   const formatTimestamp = (timestamp: number): string => {
     const now = Date.now();
@@ -111,6 +56,65 @@ export default function TabTwoScreen() {
       });
     }
   };
+
+  const fetchConversations = useCallback(async () => {
+    const groups = await groupsRepo.list();
+    console.log("building conversations: ", Date.now());
+
+    const conversationPromises = groups.map(async (group) => {
+      // Get last message for this group
+      const lastMessageData = await messagesRepo.getByGroupId(group.id, 1, 0);
+      const hasUnread = await messagesRepo.hasUnreadInGroup(group.id);
+
+      let lastMessage = "";
+      let timestamp = "";
+      let rawTimestamp = 0;
+
+      if (lastMessageData.length > 0) {
+        lastMessage = lastMessageData[0].message.contents;
+        rawTimestamp = lastMessageData[0].message.timestamp;
+        timestamp = formatTimestamp(rawTimestamp);
+      } else {
+        lastMessage = "You've been added to a group";
+        rawTimestamp = group.createdAt;
+        timestamp = formatTimestamp(rawTimestamp);
+      }
+
+      return {
+        id: group.id,
+        name: group.name,
+        lastMessage,
+        hasUnread,
+        timestamp,
+        rawTimestamp,
+      };
+    });
+
+    const fetchedConversations = (await Promise.all(conversationPromises)).sort(
+      (a, b) => b.rawTimestamp - a.rawTimestamp,
+    );
+    setConversations(fetchedConversations);
+  }, [groupsRepo, messagesRepo]);
+
+  useFocusEffect(() => {
+    fetchConversations();
+  });
+
+  useEffect(() => {
+    fetchConversations();
+
+    // Listen for group creation events
+    dbListener.onGroupCreation(fetchConversations);
+    dbListener.onGroupUpdate(fetchConversations);
+    dbListener.onMessageChange(fetchConversations);
+
+    // Cleanup listener on unmount
+    return () => {
+      dbListener.removeGroupCreationListener(fetchConversations);
+      dbListener.removeGroupUpdateListener(fetchConversations);
+      dbListener.removeMessageChangeListener(fetchConversations);
+    };
+  }, [fetchConversations]);
 
   const handleOpenModal = () => {
     setShowQRModal(true);

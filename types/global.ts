@@ -46,6 +46,11 @@ type Message = {
   timestamp: number;
 };
 
+type MessageWithPseudonym = {
+  message: Message;
+  pseudonym: string;
+};
+
 // The core packet structure for all BitChat protocol messages.
 // Encapsulates all data needed for routing through the mesh network,
 // including allowedHops for hop limiting and optional encryption.
@@ -63,6 +68,7 @@ export {
   DeliveryStatus,
   FragmentType,
   Message,
+  MessageWithPseudonym,
   PacketType,
   Result
 };

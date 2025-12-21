@@ -4,7 +4,7 @@ import {
 } from "@/contexts/repository-context";
 import { dbListener } from "@/repos/db-listener";
 import MessagesRepository from "@/repos/specs/messages-repository";
-import { Message } from "@/types/global";
+import { MessageWithPseudonym } from "@/types/global";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 const PAGE_SIZE = 50;
@@ -15,7 +15,7 @@ export const useGroupMessages = (groupId: string) => {
     () => getRepo<MessagesRepository>(MessagesRepositoryToken),
     [getRepo],
   );
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<MessageWithPseudonym[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
@@ -24,6 +24,7 @@ export const useGroupMessages = (groupId: string) => {
   const fetchMessages = useCallback(
     async (reset: boolean = false) => {
       const currentOffset = reset ? 0 : offset;
+      console.log("fetching messages: ", currentOffset);
 
       if (reset) {
         setIsLoading(true);

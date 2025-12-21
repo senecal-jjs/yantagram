@@ -1,4 +1,4 @@
-import { Message } from "@/types/global";
+import { Message, MessageWithPseudonym } from "@/types/global";
 import { UUID } from "@/types/utility";
 import * as SQLite from "expo-sqlite";
 import { dbListener } from "../db-listener";
@@ -92,9 +92,9 @@ class SQMessagesRepository implements MessagesRepository, Repository {
     groupId: string,
     limit: number,
     offset: number = 0,
-  ): Promise<Message[]> {
+  ): Promise<MessageWithPseudonym[]> {
     const statement = await this.db.prepareAsync(
-      "SELECT * FROM messages WHERE group_id = $groupId ORDER BY timestamp DESC LIMIT $limit OFFSET $offset",
+      "SELECT messages.*, contacts.pseudonym FROM messages LEFT JOIN contacts ON messages.sender = contacts.verification_key WHERE messages.group_id = $groupId ORDER BY messages.timestamp DESC LIMIT $limit OFFSET $offset",
     );
 
     try {
@@ -104,12 +104,16 @@ class SQMessagesRepository implements MessagesRepository, Repository {
         contents: string;
         timestamp: number;
         group_id: string;
+        pseudonym: string | null;
       }>({ $groupId: groupId, $limit: limit, $offset: offset });
 
       const rows = await result.getAllAsync();
 
       // Reverse to get chronological order (oldest first)
-      return rows.reverse().map((row) => this.mapRowToMessage(row));
+      return rows.reverse().map((row) => ({
+        message: this.mapRowToMessage(row),
+        pseudonym: row.pseudonym || "Unknown",
+      }));
     } finally {
       await statement.finalizeAsync();
     }
@@ -133,7 +137,7 @@ class SQMessagesRepository implements MessagesRepository, Repository {
     }
   }
 
-  async markAsRead(id: UUID): Promise<void> {
+  async markAsRead(id: UUID, notifyListener: boolean): Promise<void> {
     const statement = await this.db.prepareAsync(
       "UPDATE messages SET was_read = 1 WHERE id = $id",
     );
@@ -142,11 +146,13 @@ class SQMessagesRepository implements MessagesRepository, Repository {
       await statement.executeAsync({ $id: id });
     } finally {
       await statement.finalizeAsync();
-      dbListener.notifyMessageChange();
+      if (notifyListener) {
+        dbListener.notifyMessageChange();
+      }
     }
   }
 
-  async markGroupAsRead(groupId: UUID): Promise<void> {
+  async markGroupAsRead(groupId: UUID, notifyListener: boolean): Promise<void> {
     const statement = await this.db.prepareAsync(
       "UPDATE messages SET was_read = 1 WHERE group_id = $groupId AND was_read = 0",
     );
@@ -155,7 +161,9 @@ class SQMessagesRepository implements MessagesRepository, Repository {
       await statement.executeAsync({ $groupId: groupId });
     } finally {
       await statement.finalizeAsync();
-      dbListener.notifyMessageChange();
+      if (notifyListener) {
+        dbListener.notifyMessageChange();
+      }
     }
   }
 

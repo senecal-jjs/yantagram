@@ -17,15 +17,17 @@ import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { ChatBubble } from "@/components/chat-bubble";
 import { useCredential } from "@/contexts/credential-context";
 import {
+  GroupMembersRepositoryToken,
   GroupsRepositoryToken,
   MessagesRepositoryToken,
   useRepos,
 } from "@/contexts/repository-context";
 import { useGroupMessages } from "@/hooks/use-group-messages";
 import { useMessageSender } from "@/hooks/use-message-sender";
+import { GroupMembersRepository } from "@/repos/specs/group-members-repository";
 import GroupsRepository from "@/repos/specs/groups-repository";
 import MessagesRepository from "@/repos/specs/messages-repository";
-import { Message } from "@/types/global";
+import { Message, MessageWithPseudonym } from "@/types/global";
 import { uint8ArrayToHexString } from "@/utils/string";
 
 export default function Chat() {
@@ -35,8 +37,12 @@ export default function Chat() {
   const { sendMessage } = useMessageSender();
   const { messages, isLoading, isLoadingMore, hasMore, loadMore } =
     useGroupMessages(chatId);
+  const [groupMembersCount, setGroupMembersCount] = useState(0);
   const { getRepo } = useRepos();
   const groupsRepo = getRepo<GroupsRepository>(GroupsRepositoryToken);
+  const groupMembersRepo = getRepo<GroupMembersRepository>(
+    GroupMembersRepositoryToken,
+  );
   const messagesRepo = getRepo<MessagesRepository>(MessagesRepositoryToken);
   const flatListRef = useRef<FlatList>(null);
 
@@ -47,16 +53,23 @@ export default function Chat() {
       navigation.setOptions({
         title: group?.name ?? "Unknown Group",
       });
+
+      const groupMembers = await groupMembersRepo.getByGroup(chatId);
+
+      setGroupMembersCount(groupMembers.length);
     }
 
     getGroupName();
-  });
+  }, [chatId]);
 
-  const renderMessage = ({ item }: { item: Message }) => {
-    messagesRepo.markAsRead(item.id);
+  const renderMessage = ({ item }: { item: MessageWithPseudonym }) => {
+    // mark as read, but don't notify listener to prevent re-render loop
+    messagesRepo.markAsRead(item.message.id, false);
     return (
       <ChatBubble
-        message={item}
+        message={item.message}
+        contactPseudonym={item.pseudonym}
+        showPseudonym={groupMembersCount > 1}
         verificationKey={uint8ArrayToHexString(
           member?.credential.verificationKey!,
         )}
@@ -117,7 +130,7 @@ export default function Chat() {
             data={messages}
             showsVerticalScrollIndicator={true}
             renderItem={renderMessage}
-            keyExtractor={(item) => item.id}
+            keyExtractor={(item) => item.message.id}
             onContentSizeChange={() => {
               flatListRef.current?.scrollToEnd({ animated: true });
             }}
