@@ -12,20 +12,26 @@ class SQMessagesRepository implements MessagesRepository, Repository {
     this.db = database;
   }
 
-  async create(message: Message): Promise<Message> {
+  async create(
+    id: string,
+    groupId: string,
+    sender: string,
+    contents: string,
+    timestamp: number,
+  ): Promise<Message> {
     const statement = await this.db.prepareAsync(
       "INSERT INTO messages (id, sender, contents, timestamp, group_id) VALUES ($id, $sender, $contents, $timestamp, $groupId)",
     );
 
     try {
       await statement.executeAsync({
-        $id: message.id,
-        $sender: message.sender,
-        $contents: message.contents,
-        $timestamp: message.timestamp,
-        $groupId: message.groupId,
+        $id: id,
+        $sender: sender,
+        $contents: contents,
+        $timestamp: timestamp,
+        $groupId: groupId,
       });
-      return message;
+      return await this.get(id);
     } finally {
       await statement.finalizeAsync();
 
@@ -117,6 +123,50 @@ class SQMessagesRepository implements MessagesRepository, Repository {
     try {
       const result = await statement.executeAsync<{ count: number }>({
         $id: id,
+      });
+
+      const row = await result.getFirstAsync();
+
+      return row ? row.count > 0 : false;
+    } finally {
+      await statement.finalizeAsync();
+    }
+  }
+
+  async markAsRead(id: UUID): Promise<void> {
+    const statement = await this.db.prepareAsync(
+      "UPDATE messages SET was_read = 1 WHERE id = $id",
+    );
+
+    try {
+      await statement.executeAsync({ $id: id });
+    } finally {
+      await statement.finalizeAsync();
+      dbListener.notifyMessageChange();
+    }
+  }
+
+  async markGroupAsRead(groupId: UUID): Promise<void> {
+    const statement = await this.db.prepareAsync(
+      "UPDATE messages SET was_read = 1 WHERE group_id = $groupId AND was_read = 0",
+    );
+
+    try {
+      await statement.executeAsync({ $groupId: groupId });
+    } finally {
+      await statement.finalizeAsync();
+      dbListener.notifyMessageChange();
+    }
+  }
+
+  async hasUnreadInGroup(groupId: UUID): Promise<boolean> {
+    const statement = await this.db.prepareAsync(
+      "SELECT COUNT(*) as count FROM messages WHERE group_id = $groupId AND was_read = 0",
+    );
+
+    try {
+      const result = await statement.executeAsync<{ count: number }>({
+        $groupId: groupId,
       });
 
       const row = await result.getFirstAsync();

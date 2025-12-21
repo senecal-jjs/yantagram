@@ -9,7 +9,6 @@ import "react-native-reanimated";
 
 import { CredentialProvider } from "@/contexts/credential-context";
 import { GroupCreationProvider } from "@/contexts/group-creation-context";
-import { MessageProvider } from "@/contexts/message-context";
 import { RepositoryProvider } from "@/contexts/repository-context";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { migrateDb } from "@/repos/db";
@@ -32,23 +31,18 @@ export default function RootLayout() {
     <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
       <SQLiteProvider databaseName="bitchat.db" onInit={migrateDb}>
         <RepositoryProvider>
-          <MessageProvider>
-            <CredentialProvider>
-              <GroupCreationProvider>
-                <Stack>
-                  <Stack.Screen
-                    name="(tabs)"
-                    options={{ headerShown: false }}
-                  />
-                  <Stack.Screen
-                    name="(group-modal)"
-                    options={{ presentation: "modal", headerShown: false }}
-                  />
-                </Stack>
-                <StatusBar style="auto" />
-              </GroupCreationProvider>
-            </CredentialProvider>
-          </MessageProvider>
+          <CredentialProvider>
+            <GroupCreationProvider>
+              <Stack>
+                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                <Stack.Screen
+                  name="(group-modal)"
+                  options={{ presentation: "modal", headerShown: false }}
+                />
+              </Stack>
+              <StatusBar style="auto" />
+            </GroupCreationProvider>
+          </CredentialProvider>
         </RepositoryProvider>
       </SQLiteProvider>
     </ThemeProvider>

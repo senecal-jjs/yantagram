@@ -187,57 +187,59 @@ export function usePacketService() {
 
     const welcome = deserializeWelcomeMessage(welcomeBytes);
 
-    // Attempt decryption of the welcome message, if successful
-    // the message has reached its intended recipient.
-    // try {
-    const pathUpdate = await member.joinGroup(welcome);
-    const group = await groupsRepository.create(
-      pathUpdate.treeInfo.groupName,
-      "New Group",
-    );
+    try {
+      // Attempt decryption of the welcome message, if successful
+      // the message has reached its intended recipient.
+      // try {
+      const pathUpdate = await member.joinGroup(welcome);
 
-    // check if we recognize any members of the group as contacts
-    let groupName = "";
+      // check if we recognize any members of the group as contacts
+      const groupName = pathUpdate.treeInfo.credentials
+        .map((cred) => cred[1].pseudonym)
+        .join(", ");
 
-    for (const credential of pathUpdate.treeInfo.credentials) {
-      const verificationKeyBytes = Buffer.from(
-        credential[1].verificationKey,
-        "base64",
+      // group name off of tree info is an immutable unique uuid identifier for the group
+      // the local group name variable can be changed at will by the user to identify the group on their device
+      const group = await groupsRepository.create(
+        pathUpdate.treeInfo.groupName,
+        groupName,
       );
 
-      const contact =
-        await contactsRepository.getByVerificationKey(verificationKeyBytes);
-
-      if (contact) {
-        groupName = groupName + ` ${contact.pseudonym}`;
-        groupMembersRepository.add(group.id, contact.id);
-      } else {
-        // create a new unknown contact (verified out of band == false)
-        const newContact = await contactsRepository.create(
-          {
-            verificationKey: Buffer.from(
-              credential[1].verificationKey,
-              "base64",
-            ),
-            pseudonym: credential[1].pseudonym,
-            signature: Buffer.from(credential[1].signature, "base64"),
-            ecdhPublicKey: Buffer.from(credential[1].ecdhPublicKey, "base64"),
-          },
-          false,
+      for (const credential of pathUpdate.treeInfo.credentials) {
+        const verificationKeyBytes = Buffer.from(
+          credential[1].verificationKey,
+          "base64",
         );
 
-        groupName = groupName + ` ${newContact.pseudonym}`;
-        groupMembersRepository.add(group.id, newContact.id);
+        const contact =
+          await contactsRepository.getByVerificationKey(verificationKeyBytes);
+
+        if (contact) {
+          groupMembersRepository.add(group.id, contact.id);
+        } else {
+          // create a new unknown contact (verified out of band == false)
+          const newContact = await contactsRepository.create(
+            {
+              verificationKey: Buffer.from(
+                credential[1].verificationKey,
+                "base64",
+              ),
+              pseudonym: credential[1].pseudonym,
+              signature: Buffer.from(credential[1].signature, "base64"),
+              ecdhPublicKey: Buffer.from(credential[1].ecdhPublicKey, "base64"),
+            },
+            false,
+          );
+
+          groupMembersRepository.add(group.id, newContact.id);
+        }
       }
+
+      sendAmigoPathUpdate(pathUpdate.updateMessage);
+      saveMember();
+    } catch (error) {
+      console.log(error);
     }
-
-    groupsRepository.update(group.id, { name: groupName.trim() });
-
-    sendAmigoPathUpdate(pathUpdate.updateMessage);
-    saveMember();
-    // } catch (error) {
-    //   console.log(error);
-    // }
   };
 
   const handleAmigoPathUpdate = async (pathUpdateBytes: Uint8Array) => {
@@ -293,7 +295,13 @@ export function usePacketService() {
       const message = fromBinaryPayload(messageBytes);
       const messageExists = await messagesRepository.exists(message.id);
       if (!messageExists) {
-        messagesRepository.create(message);
+        await messagesRepository.create(
+          message.id,
+          message.groupId,
+          message.sender,
+          message.contents,
+          message.timestamp,
+        );
       }
     } else {
       console.warn("Failed to decrypt message, save for future attempt");

@@ -44,7 +44,13 @@ export function useMessageSender() {
 
     // Store in both repositories
     await outgoingMessagesRepo.create(message);
-    await messagesRepo.create(message);
+    await messagesRepo.create(
+      message.id,
+      message.groupId,
+      message.sender,
+      message.contents,
+      message.timestamp,
+    );
 
     // Attempt immediate broadcast (foreground)
     const payload = toBinaryPayload(message);

@@ -153,6 +153,7 @@ class SQGroupsRepository implements GroupsRepository, Repository {
       return group;
     } finally {
       await statement.finalizeAsync();
+      dbListener.notifyGroupUpdate();
     }
   }
 

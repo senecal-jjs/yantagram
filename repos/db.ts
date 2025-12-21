@@ -39,12 +39,14 @@ async function migrateDb(db: SQLiteDatabase) {
         contents TEXT NOT NULL, 
         timestamp INTEGER NOT NULL,
         group_id TEXT,
+        was_read INTEGER NOT NULL DEFAULT 0,
         FOREIGN KEY (group_id) REFERENCES groups(id) ON DELETE CASCADE
       );
       
       CREATE INDEX idx_messages_timestamp ON messages(timestamp);
       CREATE INDEX idx_messages_sender ON messages(sender);
       CREATE INDEX idx_messages_group_id ON messages(group_id);
+      CREATE INDEX idx_messages_was_read ON messages(was_read);
 
       CREATE TABLE IF NOT EXISTS fragments (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
