@@ -1,4 +1,5 @@
 import { BitchatPacket } from "@/types/global";
+import { quickHash } from "@/utils/hash";
 import * as SQLite from "expo-sqlite";
 import IncomingPacketsRepository from "../specs/incoming-packets-repository";
 import Repository from "../specs/repository";
@@ -12,10 +13,27 @@ class SQIncomingPacketsRepository
     this.db = database;
   }
 
+  async exists(payloadHash: number): Promise<boolean> {
+    const statement = await this.db.prepareAsync(
+      "SELECT COUNT(*) as count FROM incoming_packets WHERE payload_hash = $payloadHash",
+    );
+
+    try {
+      const result = await statement.executeAsync<{ count: number }>({
+        $payloadHash: payloadHash,
+      });
+
+      const row = await result.getFirstAsync();
+      return row ? row.count > 0 : false;
+    } finally {
+      await statement.finalizeAsync();
+    }
+  }
+
   async create(packet: BitchatPacket): Promise<BitchatPacket> {
     const statement = await this.db.prepareAsync(
-      `INSERT INTO incoming_packets (version, type, timestamp, payload, allowed_hops) 
-       VALUES ($version, $type, $timestamp, $payload, $allowedHops)`,
+      `INSERT INTO incoming_packets (version, type, timestamp, payload, allowed_hops, payload_hash) 
+       VALUES ($version, $type, $timestamp, $payload, $allowedHops, $payloadHash)`,
     );
 
     try {
@@ -24,6 +42,7 @@ class SQIncomingPacketsRepository
         $type: packet.type,
         $timestamp: packet.timestamp,
         $payload: packet.payload,
+        $payloadHash: quickHash(packet.payload),
         $allowedHops: packet.allowedHops,
       });
 

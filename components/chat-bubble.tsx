@@ -2,8 +2,10 @@ import { Message } from "@/types/global";
 import { StyleSheet, Text, View } from "react-native";
 import { SvgXml } from "react-native-svg";
 
-interface ChatBubbleProps {
+export interface ChatBubbleProps {
   message: Message;
+  contactPseudonym: string;
+  showPseudonym: boolean;
   verificationKey: string;
 }
 
@@ -14,13 +16,21 @@ const curlRight = `<svg width="17" height="21" viewBox="0 0 17 21" fill="none" x
 `;
 
 const curlLeft = `<svg width="17" height="21" viewBox="0 0 17 21" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path d="M0.11315 20.1846C5.31315 20.9846 10.4465 18.1212 12.1132 16.2879C10.3953 12.1914 21.0011 2.24186 14.0011 2.24148C12.3825 2.24148 11 -1.9986 5.11315 1.1846C5.09194 2.47144 5.11315 6.92582 5.11315 7.6842C5.11315 18.1842 -0.88685 19.5813 0.11315 20.1846Z" fill="#7e7e82ff"/>
+<path d="M0.11315 20.1846C5.31315 20.9846 10.4465 18.1212 12.1132 16.2879C10.3953 12.1914 21.0011 2.24186 14.0011 2.24148C12.3825 2.24148 11 -1.9986 5.11315 1.1846C5.09194 2.47144 5.11315 6.92582 5.11315 7.6842C5.11315 18.1842 -0.88685 19.5813 0.11315 20.1846Z" fill="#545455ff"/>
 </svg>
 `;
 
-export const ChatBubble = ({ message, verificationKey }: ChatBubbleProps) => {
+export const ChatBubble = ({
+  message,
+  contactPseudonym,
+  showPseudonym,
+  verificationKey,
+}: ChatBubbleProps) => {
   return (
     <View>
+      {message.sender !== verificationKey && showPseudonym && (
+        <Text style={styles.pseudonymText}>{contactPseudonym}</Text>
+      )}
       <View
         style={[
           styles.bubble,
@@ -56,7 +66,7 @@ export const ChatBubble = ({ message, verificationKey }: ChatBubbleProps) => {
 const styles = StyleSheet.create({
   bubble: {
     padding: 12,
-    borderRadius: 20,
+    borderRadius: 15,
     marginBottom: 10,
     maxWidth: "80%",
   },
@@ -68,15 +78,25 @@ const styles = StyleSheet.create({
   },
   myMessageText: {
     color: "white",
+    fontSize: 15,
+    fontWeight: 500,
+  },
+  pseudonymText: {
+    color: "#7e7e82ff",
+    marginLeft: 10,
+    marginBottom: 2,
+    fontSize: 12,
   },
   theirMessage: {
     marginLeft: 6,
-    backgroundColor: "#7e7e82ff",
+    backgroundColor: "#545455ff",
     alignSelf: "flex-start",
     borderBottomLeftRadius: 5,
   },
   theirMessageText: {
     color: "white",
+    fontSize: 15,
+    fontWeight: 500,
   },
   curlRight: {
     position: "absolute",

@@ -47,6 +47,9 @@ export const CredentialProvider: React.FC<{ children: ReactNode }> = ({
       try {
         setIsLoading(true);
 
+        // TEMPORARY FOR TESTING
+        // deleteFile(MEMBER_STATE_FILENAME);
+
         // Try to load encryption key and nonce from secure store
         const encryptionKeyBase64 = await secureFetch(ENCRYPTION_KEY_STORE_KEY);
         const nonceBase64 = await secureFetch(NONCE_STORE_KEY);

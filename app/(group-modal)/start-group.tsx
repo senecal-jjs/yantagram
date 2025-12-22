@@ -43,33 +43,44 @@ export default function StartMessageScreen() {
     try {
       setIsProcessingGroup(true);
 
-      // group capacity (member plus contact)
-      const groupCapacity = 2;
+      // check if a convo with the contact exists
+      const existingGroup = await groupsRepo.getSingleContactGroup(contact.id);
 
-      // group members will share this ID via the welcome message
-      // members of the group can give the group whatever name they want on their own device
-      const groupId = randomUUID();
+      if (!existingGroup) {
+        // group capacity (member plus contact)
+        const groupCapacity = 2;
 
-      // Create the group with TreeKEM
-      member.createGroup(groupCapacity, groupId, 1);
+        // group members will share this ID via the welcome message
+        // members of the group can give the group whatever name they want on their own device
+        const groupId = randomUUID();
 
-      // add creator to the group
-      await member.addToGroup(groupId);
+        // Create the group with TreeKEM
+        member.createGroup(groupCapacity, groupId, 1);
 
-      // Save update member state with new group
-      await saveMember();
+        // add creator to the group
+        await member.addToGroup(groupId);
 
-      const group = await groupsRepo.create(groupId, contact.pseudonym);
+        // Save update member state with new group
+        await saveMember();
 
-      sendWelcomeMessage(contact, member, group.id);
+        const group = await groupsRepo.create(groupId, contact.pseudonym);
 
-      console.log("Group created");
+        sendWelcomeMessage(contact, member, group.id);
 
-      // Dismiss modals and navigate to chats tab, then to the new chat
-      router.dismissTo({
-        pathname: "/chats/[chatId]",
-        params: { chatId: group.id },
-      });
+        console.log("Group created");
+
+        // Dismiss modals and navigate to chats tab, then to the new chat
+        router.dismissTo({
+          pathname: "/chats/[chatId]",
+          params: { chatId: group.id },
+        });
+      } else {
+        // Dismiss modals and navigate to chats tab, then to the new chat
+        router.dismissTo({
+          pathname: "/chats/[chatId]",
+          params: { chatId: existingGroup },
+        });
+      }
     } catch (error) {
       console.error("Failed to create group:", error);
       setIsProcessingGroup(false);
@@ -81,6 +92,11 @@ export default function StartMessageScreen() {
     initiatingMember: Member,
     groupId: UUID,
   ) => {
+    if (!member) {
+      console.error("Missing member state");
+      return;
+    }
+
     const welcomeMessage = await initiatingMember.sendWelcomeMessage(
       {
         verificationKey: contact.verificationKey,
@@ -89,7 +105,9 @@ export default function StartMessageScreen() {
         ecdhPublicKey: contact.ecdhPublicKey,
       },
       groupId,
+      member?.pseudonym,
     );
+
     sendAmigoWelcome(welcomeMessage);
   };
 

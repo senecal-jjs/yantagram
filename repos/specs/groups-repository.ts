@@ -19,4 +19,5 @@ export default interface GroupsRepository {
   ): Promise<Group>;
   delete(id: UUID): Promise<void>;
   updateLastActiveAt(id: UUID): Promise<void>;
+  getSingleContactGroup(contactId: number): Promise<UUID | null>;
 }

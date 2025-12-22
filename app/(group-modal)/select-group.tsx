@@ -1,4 +1,5 @@
 import ContactList from "@/components/contact-list";
+import { BackButton } from "@/components/ui/back-button";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useGroupCreation } from "@/contexts/group-creation-context";
 import { Contact } from "@/repos/specs/contacts-repository";
@@ -69,9 +70,7 @@ export default function NewGroupScreen() {
     <SafeAreaProvider>
       <SafeAreaView style={styles.container}>
         <View style={styles.modalHeader}>
-          <Pressable onPress={handleClose} style={styles.backButton}>
-            <IconSymbol size={25} name="chevron.left" color={"white"} />
-          </Pressable>
+          <BackButton onPress={handleClose}></BackButton>
           <Text style={styles.modalTitle}>{getTitle()}</Text>
           <Animated.View
             style={{
