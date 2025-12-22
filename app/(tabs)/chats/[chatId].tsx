@@ -242,7 +242,7 @@ export default function Chat() {
                 <View style={styles.membersContainer}>
                   <FlatList
                     data={groupMembers}
-                    keyExtractor={(item, index) => index.toString()}
+                    keyExtractor={(item) => item.id.toString()}
                     scrollEnabled={false}
                     ItemSeparatorComponent={() => (
                       <View style={styles.memberSeparator} />
