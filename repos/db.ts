@@ -115,6 +115,7 @@ async function migrateDb(db: SQLiteDatabase) {
         type INTEGER NOT NULL,
         timestamp INTEGER NOT NULL,
         payload BLOB NOT NULL,
+        payload_hash number,
         allowed_hops INTEGER NOT NULL,
         created_at INTEGER NOT NULL DEFAULT (round(unixepoch('subsec') * 1000))
       );

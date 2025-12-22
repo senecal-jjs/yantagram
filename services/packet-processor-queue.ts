@@ -1,4 +1,5 @@
 import { BitchatPacket } from "@/types/global";
+import { quickHash } from "@/utils/hash";
 import { EventEmitter } from "events";
 import { randomUUID } from "expo-crypto";
 
@@ -11,9 +12,10 @@ type QueueItem = {
 
 class PacketProcessorQueue extends EventEmitter {
   private queue: QueueItem[] = [];
+  private hashes: number[] = [];
   private processing = false;
   private maxRetries = 3;
-  private processingDelay = 100; // ms between packets
+  private processingDelay = 50; // ms between packets
   private maxConcurrent = 5;
   private activeProcessing = 0;
 
@@ -25,11 +27,16 @@ class PacketProcessorQueue extends EventEmitter {
       retries: 0,
     };
 
-    this.queue.push(item);
-    this.emit("enqueued", item);
+    const hash = quickHash(packet.payload);
 
-    if (!this.processing) {
-      this.startProcessing();
+    if (!this.hashes.includes(hash)) {
+      this.hashes.push(hash);
+      this.queue.push(item);
+      this.emit("enqueued", item);
+
+      if (!this.processing) {
+        this.startProcessing();
+      }
     }
   }
 
@@ -43,6 +50,7 @@ class PacketProcessorQueue extends EventEmitter {
         this.activeProcessing < this.maxConcurrent
       ) {
         const item = this.queue.shift();
+        this.hashes.shift();
         if (item) {
           this.processItem(item);
         }

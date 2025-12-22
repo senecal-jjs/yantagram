@@ -173,9 +173,6 @@ export default function Chat() {
           style={styles.keyboardAvoidingView}
           behavior={Platform.OS === "ios" ? "padding" : "height"}
           keyboardVerticalOffset={Platform.OS === "ios" ? 5 : 0}
-          onFocus={() => {
-            flatListRef.current?.scrollToEnd({ animated: true });
-          }}
         >
           <FlatList
             ref={flatListRef}
@@ -184,6 +181,9 @@ export default function Chat() {
             renderItem={renderMessage}
             keyExtractor={(item) => item.message.id}
             onContentSizeChange={() => {
+              flatListRef.current?.scrollToEnd({ animated: true });
+            }}
+            onLayout={() => {
               flatListRef.current?.scrollToEnd({ animated: true });
             }}
             onEndReached={handleLoadMore}
@@ -357,7 +357,7 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    backgroundColor: "#090909ff",
+    backgroundColor: "#272727ff",
     color: "white",
     borderRadius: 25,
     paddingHorizontal: 15,
@@ -365,8 +365,17 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     paddingBottom: 10,
     maxHeight: 120,
+    borderWidth: 1.5,
     borderColor: "rgba(172, 169, 169, 0.2)",
-    borderWidth: 1,
+    borderTopColor: "rgba(255, 255, 255, 0.3)",
+    borderLeftColor: "rgba(255, 255, 255, 0.25)",
+    shadowColor: "#fff",
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.15,
+    shadowRadius: 2,
   },
   sendButton: {
     position: "absolute",

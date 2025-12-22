@@ -71,4 +71,19 @@ const fileExists = (fileName: string): boolean => {
   return new File(Paths.cache, fileName).exists;
 };
 
-export { fetchFromFile, fileExists, saveToAppDirectory };
+const deleteFile = async (fileName: string): Promise<boolean> => {
+  try {
+    const file = new File(Paths.cache, fileName);
+    if (!file.exists) {
+      console.warn(`File ${fileName} does not exist`);
+      return false;
+    }
+    file.delete();
+    return true;
+  } catch (error) {
+    console.error(error);
+    return false;
+  }
+};
+
+export { deleteFile, fetchFromFile, fileExists, saveToAppDirectory };

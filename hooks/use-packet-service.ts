@@ -86,47 +86,47 @@ export function usePacketService() {
    * @param packet A raw packet of bytes received over the mesh network
    */
   const processPacket = async (packet: BitchatPacket) => {
-    await mutex.runExclusive(async () => {
-      // if no member state, do nothing
-      if (!member) return;
+    // await mutex.runExclusive(async () => {
+    // if no member state, do nothing
+    if (!member) return;
 
-      switch (packet.type) {
-        case PacketType.FRAGMENT:
-          const result = await handleFragment(packet);
+    switch (packet.type) {
+      case PacketType.FRAGMENT:
+        const result = await handleFragment(packet);
 
-          // If we were able re-assemble a message from the fragments, process further
-          if (result) {
-            switch (result.fragmentType) {
-              case FragmentType.AMIGO_WELCOME:
-                handleAmigoWelcome(result.data);
-                break;
-              case FragmentType.AMIGO_PATH_UPDATE:
-                handleAmigoPathUpdate(result.data);
-                break;
-              case FragmentType.MESSAGE:
-                handleAmigoMessage(result.data);
-                break;
-            }
-
-            fragmentsRepository.deleteByFragmentId(result.fragmentId);
+        // If we were able re-assemble a message from the fragments, process further
+        if (result) {
+          switch (result.fragmentType) {
+            case FragmentType.AMIGO_WELCOME:
+              handleAmigoWelcome(result.data);
+              break;
+            case FragmentType.AMIGO_PATH_UPDATE:
+              handleAmigoPathUpdate(result.data);
+              break;
+            case FragmentType.MESSAGE:
+              handleAmigoMessage(result.data);
+              break;
           }
-          break;
-        case PacketType.MESSAGE:
-          await handleAmigoMessage(packet.payload);
-          break;
 
-        case PacketType.AMIGO_WELCOME:
-          await handleAmigoWelcome(packet.payload);
-          break;
+          fragmentsRepository.deleteByFragmentId(result.fragmentId);
+        }
+        break;
+      case PacketType.MESSAGE:
+        await handleAmigoMessage(packet.payload);
+        break;
 
-        case PacketType.AMIGO_PATH_UPDATE:
-          await handleAmigoPathUpdate(packet.payload);
-          break;
+      case PacketType.AMIGO_WELCOME:
+        await handleAmigoWelcome(packet.payload);
+        break;
 
-        default:
-          console.warn("Unknown packet type:", packet.type);
-      }
-    });
+      case PacketType.AMIGO_PATH_UPDATE:
+        await handleAmigoPathUpdate(packet.payload);
+        break;
+
+      default:
+        console.warn("Unknown packet type:", packet.type);
+    }
+    // });
   };
 
   const handleFragment = async (
@@ -284,22 +284,24 @@ export function usePacketService() {
         );
         saveMember();
       } catch (error) {
-        // console.log(error);
+        console.log(error);
       }
     }
 
     if (messageBytes) {
       const message = fromBinaryPayload(messageBytes);
-      const messageExists = await messagesRepository.exists(message.id);
-      if (!messageExists) {
-        await messagesRepository.create(
-          message.id,
-          message.groupId,
-          message.sender,
-          message.contents,
-          message.timestamp,
-        );
-      }
+      await mutex.runExclusive(async () => {
+        const messageExists = await messagesRepository.exists(message.id);
+        if (!messageExists) {
+          await messagesRepository.create(
+            message.id,
+            message.groupId,
+            message.sender,
+            message.contents,
+            message.timestamp,
+          );
+        }
+      });
     } else {
       console.warn("Failed to decrypt message, save for future attempt");
     }

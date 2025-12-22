@@ -5,4 +5,5 @@ export default interface IncomingPacketsRepository {
   getAll(): Promise<BitchatPacket[]>;
   delete(id: number): Promise<void>;
   getEarliest(): Promise<BitchatPacket | null>;
+  exists(payloadHash: number): Promise<boolean>;
 }
