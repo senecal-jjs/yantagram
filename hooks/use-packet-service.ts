@@ -86,7 +86,6 @@ export function usePacketService() {
    * @param packet A raw packet of bytes received over the mesh network
    */
   const processPacket = async (packet: BitchatPacket) => {
-    // await mutex.runExclusive(async () => {
     // if no member state, do nothing
     if (!member) return;
 
@@ -126,7 +125,6 @@ export function usePacketService() {
       default:
         console.warn("Unknown packet type:", packet.type);
     }
-    // });
   };
 
   const handleFragment = async (
