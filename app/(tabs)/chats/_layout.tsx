@@ -14,30 +14,12 @@ export default function ChatsLayout() {
           title: "",
         }}
       />
-      {/* <Stack.Screen
-        name="start-message"
-        options={{
-          headerShown: false,
-          title: "",
-          animation: "slide_from_bottom",
-          presentation: "fullScreenModal",
-        }}
-      />
       <Stack.Screen
-        name="select-group"
+        name="[chatId]"
         options={{
           headerShown: false,
-          animation: "slide_from_left",
-          // presentation: "card",
         }}
-      />
-      <Stack.Screen
-        name="name-group"
-        options={{
-          headerShown: false,
-          // presentation: "card",
-        }}
-      /> */}
+      ></Stack.Screen>
     </Stack>
   );
 }

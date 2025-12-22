@@ -1,3 +1,4 @@
+import { BackButton } from "@/components/ui/back-button";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useCredentials } from "@/contexts/credential-context";
 import { useGroupCreation } from "@/contexts/group-creation-context";
@@ -123,9 +124,7 @@ export default function NameGroupScreen() {
         {!isProcessingGroup && (
           <View>
             <View style={styles.header}>
-              <Pressable onPress={handleClose} style={styles.backButton}>
-                <IconSymbol size={25} name="chevron.left" color={"white"} />
-              </Pressable>
+              <BackButton onPress={handleClose}></BackButton>
               <Text style={styles.headerTitle}>Name Group</Text>
               <Pressable
                 onPress={handleCreate}

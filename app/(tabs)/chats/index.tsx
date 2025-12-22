@@ -96,6 +96,7 @@ export default function TabTwoScreen() {
     setConversations(fetchedConversations);
   }, [groupsRepo, messagesRepo]);
 
+  // force refresh on focus, to make sure unread/read dot is shown appropriately
   useFocusEffect(() => {
     fetchConversations();
   });
