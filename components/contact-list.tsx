@@ -106,7 +106,7 @@ export default function ContactList({
         ) : (
           <View style={styles.timestampContainer}>
             <Text style={styles.timestamp}>
-              {new Date(item.createdAt * 1000).toLocaleDateString()}
+              {new Date(item.createdAt).toLocaleDateString()}
             </Text>
           </View>
         )}
