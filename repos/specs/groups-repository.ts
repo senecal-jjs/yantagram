@@ -3,13 +3,14 @@ import { UUID } from "@/types/utility";
 export interface Group {
   id: UUID;
   name: string;
+  admin: boolean;
   lastActiveAt: number;
   createdAt: number;
   updatedAt: number;
 }
 
 export default interface GroupsRepository {
-  create(id: UUID, name: string): Promise<Group>;
+  create(id: UUID, name: string, asAdmin: boolean): Promise<Group>;
   get(id: UUID): Promise<Group | null>;
   getByName(name: string): Promise<Group | null>;
   list(): Promise<Group[]>;

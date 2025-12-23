@@ -39,6 +39,10 @@ export default function RootLayout() {
                   name="(group-modal)"
                   options={{ presentation: "modal", headerShown: false }}
                 />
+                <Stack.Screen
+                  name="(group-manager-modal)"
+                  options={{ presentation: "modal", headerShown: false }}
+                ></Stack.Screen>
               </Stack>
               <StatusBar style="auto" />
             </GroupCreationProvider>

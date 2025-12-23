@@ -69,7 +69,7 @@ export default function NameGroupScreen() {
       // Save updated member state with new group
       await saveMember();
 
-      const group = await groupsRepo.create(groupId, groupName);
+      const group = await groupsRepo.create(groupId, groupName, true);
 
       selectedMembers.forEach((selection) => {
         groupMembersRepo.add(group.id, selection.id);

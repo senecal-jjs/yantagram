@@ -2,14 +2,9 @@ import ContactList from "@/components/contact-list";
 import { BounceButton } from "@/components/ui/bounce-button";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useCredentials } from "@/contexts/credential-context";
-import {
-  GroupMembersRepositoryToken,
-  GroupsRepositoryToken,
-  useRepos,
-} from "@/contexts/repository-context";
+import { GroupsRepositoryToken, useRepos } from "@/contexts/repository-context";
 import { useMessageSender } from "@/hooks/use-message-sender";
 import { Contact } from "@/repos/specs/contacts-repository";
-import { GroupMembersRepository } from "@/repos/specs/group-members-repository";
 import GroupsRepository from "@/repos/specs/groups-repository";
 import { Member } from "@/treekem/member";
 import { UUID } from "@/types/utility";
@@ -27,9 +22,6 @@ export default function StartMessageScreen() {
   const { sendAmigoWelcome } = useMessageSender();
   const { getRepo } = useRepos();
   const groupsRepo = getRepo<GroupsRepository>(GroupsRepositoryToken);
-  const groupMembersRepo = getRepo<GroupMembersRepository>(
-    GroupMembersRepositoryToken,
-  );
 
   const handleClose = () => {
     router.back();
@@ -64,7 +56,7 @@ export default function StartMessageScreen() {
         // Save update member state with new group
         await saveMember();
 
-        const group = await groupsRepo.create(groupId, contact.pseudonym);
+        const group = await groupsRepo.create(groupId, contact.pseudonym, true);
 
         sendWelcomeMessage(contact, member, group.id);
 

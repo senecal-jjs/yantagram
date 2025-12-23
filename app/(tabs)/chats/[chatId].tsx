@@ -1,10 +1,9 @@
 import * as Crypto from "expo-crypto";
-import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
   FlatList,
   KeyboardAvoidingView,
-  Modal,
   Platform,
   Pressable,
   StyleSheet,
@@ -16,7 +15,6 @@ import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 
 import { ChatBubble } from "@/components/chat-bubble";
 import { BackButton } from "@/components/ui/back-button";
-import { BounceButton } from "@/components/ui/bounce-button";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useCredential } from "@/contexts/credential-context";
 import {
@@ -30,13 +28,12 @@ import { useGroupMessages } from "@/hooks/use-group-messages";
 import { useMessageSender } from "@/hooks/use-message-sender";
 import ContactsRepository, { Contact } from "@/repos/specs/contacts-repository";
 import { GroupMembersRepository } from "@/repos/specs/group-members-repository";
-import GroupsRepository from "@/repos/specs/groups-repository";
+import GroupsRepository, { Group } from "@/repos/specs/groups-repository";
 import MessagesRepository from "@/repos/specs/messages-repository";
 import { Message, MessageWithPseudonym } from "@/types/global";
 import { uint8ArrayToHexString } from "@/utils/string";
 
 export default function Chat() {
-  const navigation = useNavigation();
   const router = useRouter();
   const { chatId } = useLocalSearchParams<{ chatId: string }>();
   const { member } = useCredential();
@@ -44,7 +41,7 @@ export default function Chat() {
   const { messages, isLoading, isLoadingMore, hasMore, loadMore } =
     useGroupMessages(chatId);
   const [groupName, setGroupName] = useState("Unknown Group");
-  const [showMembersModal, setShowMembersModal] = useState(false);
+  const [group, setGroup] = useState<Group | null>(null);
   const [groupMembers, setGroupMembers] = useState<Contact[]>([]);
   const { getRepo } = useRepos();
   const groupsRepo = getRepo<GroupsRepository>(GroupsRepositoryToken);
@@ -61,11 +58,8 @@ export default function Chat() {
 
       if (group) {
         setGroupName(group.name);
+        setGroup(group);
       }
-
-      // navigation.setOptions({
-      //   title: group?.name ?? "Unknown Group",
-      // });
 
       const members = await groupMembersRepo.getByGroup(chatId);
       const contactPromises = members.map(async (member) =>
@@ -136,7 +130,10 @@ export default function Chat() {
   };
 
   const onAvatarPress = () => {
-    setShowMembersModal(true);
+    router.navigate({
+      pathname: "/(group-manager-modal)/group-details",
+      params: { groupId: chatId },
+    });
   };
 
   return (
@@ -218,64 +215,6 @@ export default function Chat() {
             </Pressable>
           </View>
         </KeyboardAvoidingView>
-
-        <Modal
-          visible={showMembersModal}
-          animationType="slide"
-          presentationStyle="pageSheet"
-          onRequestClose={() => setShowMembersModal(false)}
-        >
-          <SafeAreaView style={styles.modalContainer}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Group Details</Text>
-              <BounceButton onPress={() => setShowMembersModal(false)}>
-                <IconSymbol size={42} name="x.circle" color={"white"} />
-              </BounceButton>
-            </View>
-            <View style={styles.modalContent}>
-              <View style={styles.membersSection}>
-                <Text style={styles.sectionTitle}>
-                  Members ({groupMembers.length})
-                </Text>
-                <View style={styles.membersContainer}>
-                  <FlatList
-                    data={groupMembers}
-                    keyExtractor={(item) => item.id.toString()}
-                    scrollEnabled={false}
-                    ItemSeparatorComponent={() => (
-                      <View style={styles.memberSeparator} />
-                    )}
-                    renderItem={({ item }) => (
-                      <View style={styles.memberItem}>
-                        <View style={styles.memberAvatar}>
-                          <Text style={styles.memberAvatarText}>
-                            {item?.pseudonym?.charAt(0)?.toUpperCase() || "?"}
-                          </Text>
-                        </View>
-                        <View style={styles.memberInfo}>
-                          <Text style={styles.memberName}>
-                            {item?.pseudonym || "Unknown"}
-                          </Text>
-                          <Text style={styles.memberKey} numberOfLines={1}>
-                            {item?.verificationKey
-                              ? item.verificationKey
-                                  .slice(0, 8)
-                                  .reduce(
-                                    (acc, byte) =>
-                                      acc + byte.toString(16).padStart(2, "0"),
-                                    "",
-                                  ) + "..."
-                              : "Unknown"}
-                          </Text>
-                        </View>
-                      </View>
-                    )}
-                  />
-                </View>
-              </View>
-            </View>
-          </SafeAreaView>
-        </Modal>
       </SafeAreaView>
     </SafeAreaProvider>
   );
@@ -395,81 +334,5 @@ const styles = StyleSheet.create({
   loadingFooter: {
     paddingVertical: 20,
     alignItems: "center",
-  },
-  modalContainer: {
-    flex: 1,
-    backgroundColor: "#090909ff",
-  },
-  modalHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: 15,
-    backgroundColor: "rgba(38, 35, 35, 0.2)",
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(255, 255, 255, 0.1)",
-  },
-  modalTitle: {
-    color: "white",
-    fontSize: 18,
-    fontWeight: "600",
-  },
-  modalContent: {
-    padding: 20,
-  },
-  membersSection: {
-    marginTop: 0,
-  },
-  sectionTitle: {
-    color: "#888",
-    fontSize: 14,
-    fontWeight: "600",
-    marginBottom: 10,
-    textTransform: "uppercase",
-  },
-  membersContainer: {
-    backgroundColor: "rgba(38, 35, 35, 0.3)",
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.1)",
-    overflow: "hidden",
-  },
-  memberItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 12,
-  },
-  memberSeparator: {
-    height: 1,
-    backgroundColor: "rgba(255, 255, 255, 0.1)",
-    marginLeft: 64,
-  },
-  memberAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#333",
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 12,
-  },
-  memberAvatarText: {
-    color: "#fff",
-    fontSize: 18,
-    fontWeight: "bold",
-  },
-  memberInfo: {
-    flex: 1,
-  },
-  memberName: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
-    marginBottom: 2,
-  },
-  memberKey: {
-    color: "#666",
-    fontSize: 12,
-    fontFamily: "monospace",
   },
 });

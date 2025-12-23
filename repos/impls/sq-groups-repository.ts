@@ -34,15 +34,20 @@ class SQGroupsRepository implements GroupsRepository, Repository {
     }
   }
 
-  async create(id: UUID, name: string): Promise<Group> {
+  async create(
+    id: UUID,
+    name: string,
+    asAdmin: boolean = false,
+  ): Promise<Group> {
     const statement = await this.db.prepareAsync(
-      `INSERT INTO groups (id, name) VALUES ($id, $name)`,
+      `INSERT INTO groups (id, name, admin) VALUES ($id, $name, $admin)`,
     );
 
     try {
       await statement.executeAsync({
         $id: id,
         $name: name,
+        $admin: asAdmin,
       });
 
       // Fetch the created group
@@ -67,6 +72,7 @@ class SQGroupsRepository implements GroupsRepository, Repository {
       const result = await statement.executeAsync<{
         id: string;
         name: string;
+        admin: number;
         last_active_at: number;
         created_at: number;
         updated_at: number;
@@ -93,6 +99,7 @@ class SQGroupsRepository implements GroupsRepository, Repository {
       const result = await statement.executeAsync<{
         id: string;
         name: string;
+        admin: number;
         last_active_at: number;
         created_at: number;
         updated_at: number;
@@ -119,6 +126,7 @@ class SQGroupsRepository implements GroupsRepository, Repository {
       const result = await statement.executeAsync<{
         id: string;
         name: string;
+        admin: number;
         last_active_at: number;
         created_at: number;
         updated_at: number;
@@ -210,6 +218,7 @@ class SQGroupsRepository implements GroupsRepository, Repository {
   private mapRowToGroup(row: {
     id: string;
     name: string;
+    admin: number;
     last_active_at: number;
     created_at: number;
     updated_at: number;
@@ -217,6 +226,7 @@ class SQGroupsRepository implements GroupsRepository, Repository {
     return {
       id: row.id,
       name: row.name,
+      admin: row.admin === 1,
       lastActiveAt: row.last_active_at,
       createdAt: row.created_at,
       updatedAt: row.updated_at,

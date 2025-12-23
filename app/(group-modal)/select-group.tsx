@@ -1,18 +1,8 @@
-import ContactList from "@/components/contact-list";
-import { BackButton } from "@/components/ui/back-button";
-import { IconSymbol } from "@/components/ui/icon-symbol";
+import MemberSelection from "@/components/member-selection";
 import { useGroupCreation } from "@/contexts/group-creation-context";
-import { Contact } from "@/repos/specs/contacts-repository";
 import { useNavigation, useRouter } from "expo-router";
 import { useEffect, useRef } from "react";
-import {
-  Animated,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { Animated, StyleSheet } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 
 export default function NewGroupScreen() {
@@ -48,90 +38,17 @@ export default function NewGroupScreen() {
     });
   };
 
-  const onContactSelect = (contact: Contact) => {
-    setSelectedMembers([...selectedMembers, contact]);
-  };
-
-  const onContactDeselect = (contact: Contact) => {
-    setSelectedMembers(selectedMembers.filter((c) => c.id !== contact.id));
-  };
-
-  const getTitle = () => {
-    if (selectedMembers.length === 0) {
-      return "Select Members";
-    } else if (selectedMembers.length === 1) {
-      return "1 Member";
-    } else {
-      return `${selectedMembers.length} Members`;
-    }
-  };
-
   return (
     <SafeAreaProvider>
       <SafeAreaView style={styles.container}>
-        <View style={styles.modalHeader}>
-          <BackButton onPress={handleClose}></BackButton>
-          <Text style={styles.modalTitle}>{getTitle()}</Text>
-          <Animated.View
-            style={{
-              opacity: fadeAnim,
-              transform: [
-                {
-                  scale: fadeAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [0.8, 1],
-                  }),
-                },
-              ],
-            }}
-            pointerEvents={selectedMembers.length > 0 ? "auto" : "none"}
-          >
-            <Pressable onPress={handleNextPress}>
-              <Text style={styles.next}>Next</Text>
-            </Pressable>
-          </Animated.View>
-        </View>
-
-        {selectedMembers.length > 0 && (
-          <View style={styles.selectedMembersContainer}>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.selectedMembersScroll}
-            >
-              {selectedMembers.map((contact) => (
-                <Pressable
-                  key={contact.id}
-                  style={styles.selectedMemberChip}
-                  onPress={() => onContactDeselect(contact)}
-                >
-                  <View style={styles.selectedMemberAvatar}>
-                    <Text style={styles.selectedMemberAvatarText}>
-                      {contact.pseudonym.charAt(0).toUpperCase()}
-                    </Text>
-                  </View>
-                  <View style={styles.removeIconContainer}>
-                    <IconSymbol
-                      size={14}
-                      name="xmark.circle.fill"
-                      color="#666"
-                    />
-                  </View>
-                  <Text style={styles.selectedMemberAvatarName}>
-                    {contact.pseudonym.slice(0, 8)}
-                  </Text>
-                </Pressable>
-              ))}
-            </ScrollView>
-          </View>
-        )}
-
-        <ContactList
-          selectable={true}
-          selectedContactIds={selectedMembers.map((m) => m.id)}
-          onContactSelect={onContactSelect}
-          onContactDeselect={onContactDeselect}
-        ></ContactList>
+        <MemberSelection
+          handleClose={handleClose}
+          handleNextPress={handleNextPress}
+          selectedMembers={selectedMembers}
+          nextLanguage="Next"
+          setSelectedMembers={setSelectedMembers}
+          contactsToRemove={[]}
+        ></MemberSelection>
       </SafeAreaView>
     </SafeAreaProvider>
   );

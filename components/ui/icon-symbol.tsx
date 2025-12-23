@@ -27,6 +27,7 @@ const MAPPING = {
   "x.circle": "close",
   "square.and.arrow.up": "ios-share",
   "person.2": "group",
+  "person.badge.plus": "group-add",
 } as IconMapping;
 
 /**
