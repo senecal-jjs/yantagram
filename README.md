@@ -41,6 +41,18 @@ All cryptographic operations use pure JavaScript implementations from the [@nobl
 - Random pseudonym generation (30,625 unique combinations)
 - Dark theme UI
 - Tab-based navigation
+- **Settings Management**: Comprehensive settings system with persistent storage
+- **Message Retention Control**: Configurable message auto-deletion (10 minutes to 5 days)
+- **User Profile Management**: Easy pseudonym updates with real-time saving
+- **Security Information**: Detailed privacy and security feature explanations
+- **Panic Mode**: Triple-tap panic button for instant message deletion
+- **Data Management**: Selective deletion of messages or complete app data reset
+- **Settings Management**: Comprehensive settings system with persistent storage
+- **Message Retention Control**: Configurable message auto-deletion (10 minutes to 5 days)
+- **User Profile Management**: Easy pseudonym updates with real-time saving
+- **Security Information**: Detailed privacy and security feature explanations
+- **Panic Mode**: Triple-tap panic button for instant message deletion
+- **Data Management**: Selective deletion of messages or complete app data reset
 
 ## Architecture
 
@@ -49,8 +61,18 @@ All cryptographic operations use pure JavaScript implementations from the [@nobl
 ```
 app/                      # Expo Router file-based routing
   (tabs)/                 # Tab navigation
-    index.tsx            # Chats list screen
+    index.tsx            # Chats list screen (with panic button)
     chats/[chatId].tsx   # Individual chat screen
+  (settings-modal)/       # Settings modal screens
+    start-settings.tsx   # Main settings screen
+    my-info.tsx         # User profile management
+    security-privacy.tsx # Security information
+    message-retention.tsx # Message retention settings
+  (settings-modal)/       # Settings modal screens
+    start-settings.tsx   # Main settings screen
+    my-info.tsx         # User profile management
+    security-privacy.tsx # Security information
+    message-retention.tsx # Message retention settings
   _layout.tsx            # Root layout with credential initialization
   modal.tsx              # Modal screens
 
@@ -65,6 +87,9 @@ contexts/                # React context providers
   credential-context.tsx # Credential management
   message-context.tsx    # Message state
   repository-context.tsx # Database repository access
+  settings-context.tsx   # App settings management
+  settings-context.tsx   # App settings management
+  settings-context.tsx   # App settings management
 
 hooks/                   # Custom React hooks
   use-cipher-service.ts  # Encryption/decryption
@@ -189,6 +214,15 @@ Devices act as relay nodes to extend network range:
 - **Timing Obfuscation**: Random delays prevent traffic analysis
 - **Dummy Traffic**: Planned support for cover traffic
 - **Metadata Protection**: Encrypted sender/recipient in higher-layer protocols
+- **Panic Mode**: Triple-tap emergency message deletion
+- **Message Auto-Deletion**: Configurable retention periods
+- **Data Sovereignty**: Complete local data control with selective or full deletion
+- **Panic Mode**: Triple-tap emergency message deletion
+- **Message Auto-Deletion**: Configurable retention periods
+- **Data Sovereignty**: Complete local data control with selective or full deletion
+- **Panic Mode**: Triple-tap emergency message deletion
+- **Message Auto-Deletion**: Configurable retention periods
+- **Data Sovereignty**: Complete local data control with selective or full deletion
 
 #### Challenges & Solutions (TODO)
 | Challenge | Solution |
@@ -231,6 +265,35 @@ interface Credentials {
   ecdhPublicKey: Uint8Array;     // X25519 public key (32 bytes)
 }
 ```
+
+## Settings & Privacy
+
+### Settings Management
+The app includes a comprehensive settings system that persists user preferences:
+
+- **Message Retention**: Configure automatic message deletion from 10 minutes to 5 days
+- **User Profile**: Update pseudonym with real-time saving
+- **Data Management**: Selective message deletion or complete app reset
+- **Security Information**: Detailed explanations of privacy and security features
+
+### Settings Storage
+Settings are stored locally using encrypted JSON files:
+```typescript
+interface Settings {
+  messageRetentionMinutes: number;
+  notificationsEnabled: boolean;
+  theme: 'dark' | 'light' | 'auto';
+  autoDeleteMessages: boolean;
+  encryptionEnabled: boolean;
+  lastUpdated: string;
+}
+```
+
+### Privacy Controls
+- **Panic Button**: Triple-tap emergency deletion of all messages
+- **Data Deletion**: Granular control over message and credential deletion
+- **Local Storage**: All settings and data remain on device
+- **No Telemetry**: No usage data collection or transmission
 
 ## Getting Started
 
@@ -298,6 +361,9 @@ npm test treekem/__tests__/treekem-test.ts
 - `react-native-qrcode-svg` - QR code generation
 - `react-native-svg` - SVG rendering
 - `react-native-safe-area-context` - Safe area handling
+- `@miblanchard/react-native-slider` - Settings sliders
+- `@miblanchard/react-native-slider` - Settings sliders
+- `@miblanchard/react-native-slider` - Settings sliders
 
 ## Contributing
 
