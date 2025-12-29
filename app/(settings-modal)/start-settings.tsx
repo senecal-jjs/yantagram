@@ -1,19 +1,107 @@
+import { BounceButton } from "@/components/ui/bounce-button";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useCredentials } from "@/contexts/credential-context";
+import {
+  MessagesRepositoryToken,
+  useRepos,
+} from "@/contexts/repository-context";
+import { useSettings } from "@/contexts/settings-context";
+import MessagesRepository from "@/repos/specs/messages-repository";
 import { useRouter } from "expo-router";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 
 export default function StartSettingsScreen() {
-  const { credentials } = useCredentials();
+  const { credentials, deleteMember } = useCredentials();
+  const { resetSettings } = useSettings();
+  const { getRepo } = useRepos();
+  const messagesRepo = getRepo<MessagesRepository>(MessagesRepositoryToken);
   const router = useRouter();
+
+  const deleteAllAppData = () => {
+    Alert.alert(
+      "Delete All App Data",
+      "This will permanently delete all your data including your identity, messages, and settings. This action cannot be undone.",
+      [
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await deleteMember();
+              await resetSettings();
+              Alert.alert(
+                "Data Deleted",
+                "All app data has been deleted. The app will restart.",
+                [
+                  {
+                    text: "OK",
+                    onPress: () => router.replace("/"),
+                  },
+                ],
+              );
+            } catch (error) {
+              Alert.alert(
+                "Error",
+                "Failed to delete all data. Please try again.",
+              );
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const deleteAllMessages = () => {
+    Alert.alert(
+      "Delete All Messages",
+      "This will permanently delete all your messages but keep your identity and settings. This action cannot be undone.",
+      [
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await messagesRepo.deleteAll();
+              Alert.alert(
+                "Messages Deleted",
+                "All messages have been deleted successfully.",
+              );
+            } catch (error) {
+              Alert.alert(
+                "Error",
+                "Failed to delete messages. Please try again.",
+              );
+            }
+          },
+        },
+      ],
+    );
+  };
 
   return (
     <SafeAreaProvider style={{ backgroundColor: "#1d1d1dff" }}>
       <SafeAreaView style={styles.container}>
-        <View style={styles.headerContainer}>
-          <View style={styles.logoAvatar}></View>
-          <Text style={styles.headerText}>Yantagram</Text>
+        <View style={styles.topBar}>
+          <View style={styles.spacer} />
+          <View style={styles.headerContainer}>
+            <View style={styles.logoAvatar}></View>
+            <Text style={styles.headerText}>Yantagram</Text>
+          </View>
+          <BounceButton
+            onPress={() => router.back()}
+            style={styles.closeButton}
+          >
+            <IconSymbol size={42} name="x.circle" color={"white"} />
+          </BounceButton>
         </View>
 
         <Pressable
@@ -43,6 +131,11 @@ export default function StartSettingsScreen() {
               styles.preferenceItemTop,
               pressed && styles.itemPressed,
             ]}
+            onPress={() =>
+              router.navigate({
+                pathname: "/(settings-modal)/message-retention",
+              })
+            }
           >
             <View style={[styles.preferenceContent, styles.preferenceBorder]}>
               <Text style={styles.buttonText}>Message Retention</Text>
@@ -94,13 +187,25 @@ export default function StartSettingsScreen() {
             styles.shadow,
             pressed && styles.itemPressed,
           ]}
+          onPress={deleteAllAppData}
         >
           <Text style={styles.danger}>Delete all app data</Text>
+        </Pressable>
+
+        <Pressable
+          style={({ pressed }) => [
+            styles.button,
+            styles.shadow,
+            pressed && styles.itemPressed,
+          ]}
+          onPress={deleteAllMessages}
+        >
+          <Text style={styles.danger}>Delete messages</Text>
         </Pressable>
         <View style={styles.warningContainer}>
           <Text style={styles.warningText}>
             Application security and encryption have not yet been fully audited.
-            Use at your own discretion.
+            Use this application at your own discretion.
           </Text>
         </View>
       </SafeAreaView>
@@ -165,11 +270,27 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    alignSelf: "center",
     backgroundColor: "black",
     borderRadius: 25,
     padding: 10,
+  },
+  topBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     marginBottom: 15,
+  },
+  spacer: {
+    width: 46, // Same width as close button to center the header
+  },
+  closeButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    marginRight: 10,
+    backgroundColor: "#333",
+    justifyContent: "center",
+    alignItems: "center",
   },
   headerText: {
     color: "white",

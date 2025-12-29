@@ -10,6 +10,7 @@ import "react-native-reanimated";
 import { CredentialProvider } from "@/contexts/credential-context";
 import { GroupCreationProvider } from "@/contexts/group-creation-context";
 import { RepositoryProvider } from "@/contexts/repository-context";
+import { SettingsProvider } from "@/contexts/settings-context";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { migrateDb } from "@/repos/db";
 import { Buffer } from "buffer";
@@ -29,30 +30,35 @@ export default function RootLayout() {
 
   return (
     <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
-      <SQLiteProvider databaseName="bitchat.db" onInit={migrateDb}>
-        <RepositoryProvider>
-          <CredentialProvider>
-            <GroupCreationProvider>
-              <Stack>
-                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                <Stack.Screen
-                  name="(group-modal)"
-                  options={{ presentation: "modal", headerShown: false }}
-                />
-                <Stack.Screen
-                  name="(group-manager-modal)"
-                  options={{ presentation: "modal", headerShown: false }}
-                ></Stack.Screen>
-                <Stack.Screen
-                  name="(settings-modal)"
-                  options={{ presentation: "modal", headerShown: false }}
-                ></Stack.Screen>
-              </Stack>
-              <StatusBar style="auto" />
-            </GroupCreationProvider>
-          </CredentialProvider>
-        </RepositoryProvider>
-      </SQLiteProvider>
+      <SettingsProvider>
+        <SQLiteProvider databaseName="bitchat.db" onInit={migrateDb}>
+          <RepositoryProvider>
+            <CredentialProvider>
+              <GroupCreationProvider>
+                <Stack>
+                  <Stack.Screen
+                    name="(tabs)"
+                    options={{ headerShown: false }}
+                  />
+                  <Stack.Screen
+                    name="(group-modal)"
+                    options={{ presentation: "modal", headerShown: false }}
+                  />
+                  <Stack.Screen
+                    name="(group-manager-modal)"
+                    options={{ presentation: "modal", headerShown: false }}
+                  ></Stack.Screen>
+                  <Stack.Screen
+                    name="(settings-modal)"
+                    options={{ presentation: "modal", headerShown: false }}
+                  ></Stack.Screen>
+                </Stack>
+                <StatusBar style="auto" />
+              </GroupCreationProvider>
+            </CredentialProvider>
+          </RepositoryProvider>
+        </SQLiteProvider>
+      </SettingsProvider>
     </ThemeProvider>
   );
 }

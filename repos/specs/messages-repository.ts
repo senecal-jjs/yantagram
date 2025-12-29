@@ -25,4 +25,5 @@ export default interface MessagesRepository {
   markGroupAsRead(groupId: UUID, notifyListener: boolean): Promise<void>;
   markAsRead(id: UUID, notifyListener: boolean): Promise<void>;
   hasUnreadInGroup(groupId: UUID): Promise<boolean>;
+  deleteAll(): Promise<void>;
 }

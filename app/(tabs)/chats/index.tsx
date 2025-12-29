@@ -2,17 +2,19 @@ import ConversationItem from "@/components/conversation";
 import QRModal from "@/components/qr-modal";
 import { BounceButton } from "@/components/ui/bounce-button";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { useCredentials } from "@/contexts/credential-context";
 import {
   GroupsRepositoryToken,
   MessagesRepositoryToken,
   useRepos,
 } from "@/contexts/repository-context";
+import { useSettings } from "@/contexts/settings-context";
 import { dbListener } from "@/repos/db-listener";
 import GroupsRepository from "@/repos/specs/groups-repository";
 import MessagesRepository from "@/repos/specs/messages-repository";
 import { useFocusEffect, useRouter } from "expo-router";
-import React, { useCallback, useEffect, useState } from "react";
-import { FlatList, StyleSheet, Text, View } from "react-native";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { Alert, FlatList, StyleSheet, Text, View } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 
 export type Conversation = {
@@ -26,11 +28,48 @@ export type Conversation = {
 
 export default function TabTwoScreen() {
   const router = useRouter();
+  const { deleteMember } = useCredentials();
+  const { resetSettings } = useSettings();
   const [showQRModal, setShowQRModal] = useState(false);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const { getRepo } = useRepos();
   const groupsRepo = getRepo<GroupsRepository>(GroupsRepositoryToken);
   const messagesRepo = getRepo<MessagesRepository>(MessagesRepositoryToken);
+  const tapCount = useRef(0);
+  const tapTimer = useRef<NodeJS.Timeout | null>(null);
+
+  const handlePanicButton = async () => {
+    tapCount.current += 1;
+
+    if (tapTimer.current) {
+      clearTimeout(tapTimer.current);
+    }
+
+    if (tapCount.current === 3) {
+      tapCount.current = 0;
+      try {
+        await messagesRepo.deleteAll();
+        await deleteMember();
+        await resetSettings();
+        Alert.alert(
+          "Data Deleted",
+          "All app data has been deleted. The app will restart.",
+          [
+            {
+              text: "OK",
+              onPress: () => router.replace("/"),
+            },
+          ],
+        );
+      } catch (error) {
+        Alert.alert("Error", "Failed to delete messages.");
+      }
+    } else {
+      tapTimer.current = setTimeout(() => {
+        tapCount.current = 0;
+      }, 1000); // Reset after 1 second
+    }
+  };
 
   const formatTimestamp = (timestamp: number): string => {
     const now = Date.now();
@@ -192,6 +231,16 @@ export default function TabTwoScreen() {
           </BounceButton>
         </View>
 
+        <View style={styles.panicButtonContainer}>
+          <BounceButton style={styles.panicButton} onPress={handlePanicButton}>
+            <IconSymbol
+              size={24}
+              name="exclamationmark.triangle.fill"
+              color={"#ff4444"}
+            ></IconSymbol>
+          </BounceButton>
+        </View>
+
         <QRModal
           showQRModal={showQRModal}
           handleClose={() => setShowQRModal(false)}
@@ -247,6 +296,35 @@ const styles = StyleSheet.create({
     position: "absolute",
     bottom: 20,
     right: 20,
+  },
+  floatingButtonBottomLeft: {
+    position: "absolute",
+    bottom: 20,
+    left: 20,
+  },
+  panicButtonContainer: {
+    position: "absolute",
+    bottom: 20,
+    left: 20,
+  },
+  panicButton: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: "#272727ff",
+    justifyContent: "center",
+    alignItems: "center",
+    borderTopWidth: 1,
+    borderLeftWidth: 1,
+    borderTopColor: "rgba(255, 255, 255, 0.15)",
+    borderLeftColor: "rgba(255, 255, 255, 0.15)",
+    shadowColor: "rgba(255, 255, 255, 0.1)",
+    shadowOffset: {
+      width: -1,
+      height: -1,
+    },
+    shadowOpacity: 1,
+    shadowRadius: 2,
   },
   floatingButtonContainer: {
     flexDirection: "row",
