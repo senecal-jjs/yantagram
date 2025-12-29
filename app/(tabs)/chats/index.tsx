@@ -65,6 +65,7 @@ export default function TabTwoScreen() {
         Alert.alert("Error", "Failed to delete messages.");
       }
     } else {
+      // type error is due to difference between browser and nodejs types
       tapTimer.current = setTimeout(() => {
         tapCount.current = 0;
       }, 1000); // Reset after 1 second
