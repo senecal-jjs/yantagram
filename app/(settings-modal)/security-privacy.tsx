@@ -50,21 +50,6 @@ export default function SecurityPrivacyScreen() {
         <View style={styles.section}>
           <View style={styles.headerRow}>
             <Ionicons
-              name="person-circle-outline"
-              size={22}
-              color="#5766b1"
-              style={styles.icon}
-            />
-            <Text style={styles.header}>Private Identity</Text>
-          </View>
-          <Text style={styles.body}>
-            You control your own nickname and identity. Your information is
-            stored only on your device, not on a central server.
-          </Text>
-        </View>
-        <View style={styles.section}>
-          <View style={styles.headerRow}>
-            <Ionicons
               name="cloud-offline-outline"
               size={22}
               color="#5766b1"
