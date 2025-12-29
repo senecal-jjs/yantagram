@@ -13,6 +13,22 @@ export default function ModalLayout() {
           headerShown: false,
         }}
       ></Stack.Screen>
+      <Stack.Screen
+        name="my-info"
+        options={{
+          headerShown: false,
+          presentation: "card",
+          animation: "slide_from_right",
+        }}
+      ></Stack.Screen>
+      <Stack.Screen
+        name="security-privacy"
+        options={{
+          headerShown: false,
+          presentation: "card",
+          animation: "slide_from_right",
+        }}
+      ></Stack.Screen>
     </Stack>
   );
 }

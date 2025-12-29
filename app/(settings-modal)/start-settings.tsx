@@ -1,10 +1,12 @@
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useCredentials } from "@/contexts/credential-context";
+import { useRouter } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 
 export default function StartSettingsScreen() {
   const { credentials } = useCredentials();
+  const router = useRouter();
 
   return (
     <SafeAreaProvider style={{ backgroundColor: "#1d1d1dff" }}>
@@ -20,7 +22,7 @@ export default function StartSettingsScreen() {
             styles.shadow,
             pressed && styles.itemPressed,
           ]}
-          onPress={() => {}}
+          onPress={() => router.push("/(settings-modal)/my-info")}
         >
           <Text style={styles.buttonText}>My Info</Text>
           <View style={{ flexDirection: "row", alignItems: "center" }}>
@@ -76,6 +78,9 @@ export default function StartSettingsScreen() {
             styles.shadow,
             pressed && styles.itemPressed,
           ]}
+          onPress={() =>
+            router.navigate({ pathname: "/(settings-modal)/security-privacy" })
+          }
         >
           <Text style={styles.buttonText}>Security & Privacy</Text>
           <IconSymbol name="chevron.right" color="white" size={15}></IconSymbol>
@@ -92,6 +97,12 @@ export default function StartSettingsScreen() {
         >
           <Text style={styles.danger}>Delete all app data</Text>
         </Pressable>
+        <View style={styles.warningContainer}>
+          <Text style={styles.warningText}>
+            Application security and encryption have not yet been fully audited.
+            Use at your own discretion.
+          </Text>
+        </View>
       </SafeAreaView>
     </SafeAreaProvider>
   );
@@ -196,5 +207,18 @@ const styles = StyleSheet.create({
     fontWeight: 500,
     color: "white",
     padding: 15,
+  },
+  warningContainer: {
+    marginTop: 40,
+    padding: 12,
+    backgroundColor: "#2a1a1a",
+    borderRadius: 8,
+    alignItems: "center",
+    marginHorizontal: 10,
+    marginBottom: 20,
+  },
+  warningText: {
+    color: "#ffb300",
+    fontSize: 14,
   },
 });
