@@ -198,6 +198,7 @@ export function usePacketService() {
       const group = await groupsRepository.create(
         pathUpdate.treeInfo.groupName,
         groupName,
+        false,
       );
 
       for (const credential of pathUpdate.treeInfo.credentials) {

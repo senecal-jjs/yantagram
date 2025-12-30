@@ -239,6 +239,16 @@ class SQContactsRepository implements ContactsRepository, Repository {
     }
   }
 
+  async deleteAll(): Promise<void> {
+    const statement = await this.db.prepareAsync("DELETE FROM contacts");
+
+    try {
+      await statement.executeAsync();
+    } finally {
+      await statement.finalizeAsync();
+    }
+  }
+
   private mapRowToContact(row: {
     id: number;
     verification_key: string;

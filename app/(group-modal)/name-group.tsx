@@ -69,7 +69,7 @@ export default function NameGroupScreen() {
       // Save updated member state with new group
       await saveMember();
 
-      const group = await groupsRepo.create(groupId, groupName);
+      const group = await groupsRepo.create(groupId, groupName, true);
 
       selectedMembers.forEach((selection) => {
         groupMembersRepo.add(group.id, selection.id);
@@ -130,15 +130,21 @@ export default function NameGroupScreen() {
                 onPress={handleCreate}
                 disabled={!groupName.trim() || isProcessingGroup}
               >
-                <Text
-                  style={[
-                    styles.createButton,
-                    (!groupName.trim() || isProcessingGroup) &&
-                      styles.createButtonDisabled,
-                  ]}
-                >
-                  Create
-                </Text>
+                {({ pressed }) => (
+                  <Text
+                    style={[
+                      styles.createButton,
+                      (!groupName.trim() || isProcessingGroup) &&
+                        styles.createButtonDisabled,
+                      pressed &&
+                        groupName.trim() &&
+                        !isProcessingGroup &&
+                        styles.createButtonPressed,
+                    ]}
+                  >
+                    Create
+                  </Text>
+                )}
               </Pressable>
             </View>
 
@@ -236,6 +242,9 @@ const styles = StyleSheet.create({
     color: "white",
     fontSize: 16,
     fontWeight: "600",
+  },
+  createButtonPressed: {
+    color: "#4CAF50",
   },
   createButtonDisabled: {
     color: "#666",

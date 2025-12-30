@@ -12,6 +12,19 @@ class SQMessagesRepository implements MessagesRepository, Repository {
     this.db = database;
   }
 
+  async deleteAll(): Promise<void> {
+    const statement = await this.db.prepareAsync("DELETE FROM messages");
+
+    try {
+      await statement.executeAsync();
+    } finally {
+      await statement.finalizeAsync();
+
+      // Notify listeners of the change
+      dbListener.notifyMessageChange();
+    }
+  }
+
   async create(
     id: string,
     groupId: string,

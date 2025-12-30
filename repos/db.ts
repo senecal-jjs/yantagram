@@ -89,6 +89,7 @@ async function migrateDb(db: SQLiteDatabase) {
       CREATE TABLE IF NOT EXISTS groups (
         id TEXT PRIMARY KEY NOT NULL,
         name TEXT NOT NULL,
+        admin INTEGER NOT NULL DEFAULT 0,
         last_active_at INTEGER NOT NULL DEFAULT (round(unixepoch('subsec') * 1000)),
         created_at INTEGER NOT NULL DEFAULT (round(unixepoch('subsec') * 1000)),
         updated_at INTEGER NOT NULL DEFAULT (round(unixepoch('subsec') * 1000))

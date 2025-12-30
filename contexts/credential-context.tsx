@@ -38,52 +38,50 @@ export const CredentialProvider: React.FC<{ children: ReactNode }> = ({
   const [credentials, setCredentials] = useState<Credentials | null>(null);
   const [pseudonym, setPseudonym] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const initializeMember = async () => {
+    try {
+      setIsLoading(true);
 
+      // TEMPORARY FOR TESTING
+      // deleteFile(MEMBER_STATE_FILENAME);
+
+      // Try to load encryption key and nonce from secure store
+      const encryptionKeyBase64 = await secureFetch(ENCRYPTION_KEY_STORE_KEY);
+      const nonceBase64 = await secureFetch(NONCE_STORE_KEY);
+
+      const encryptionKey = Buffer.from(encryptionKeyBase64, "base64");
+      const nonce = { data: Buffer.from(nonceBase64, "base64") };
+
+      // Load encrypted member state from file
+      const storedMemberState = await fetchFromFile(
+        MEMBER_STATE_FILENAME,
+        encryptionKey,
+        nonce,
+      );
+
+      if (!storedMemberState) {
+        throw new Error("Failed to load member state from file");
+      }
+
+      const loadedMember = Member.fromJSON(JSON.parse(storedMemberState));
+
+      console.log("Loaded member: ", loadedMember.credential.ecdhPublicKey);
+
+      setMember(loadedMember);
+      setCredentials(loadedMember.credential);
+      setPseudonym(loadedMember.pseudonym);
+    } catch {
+      // No member state exists, create new member
+      console.log("No member state found, creating new member");
+      await generateNewMember(generateRandomName());
+    } finally {
+      setIsLoading(false);
+    }
+  };
   /**
    * Load member from encrypted file or create new one
    */
   useEffect(() => {
-    const initializeMember = async () => {
-      try {
-        setIsLoading(true);
-
-        // TEMPORARY FOR TESTING
-        // deleteFile(MEMBER_STATE_FILENAME);
-
-        // Try to load encryption key and nonce from secure store
-        const encryptionKeyBase64 = await secureFetch(ENCRYPTION_KEY_STORE_KEY);
-        const nonceBase64 = await secureFetch(NONCE_STORE_KEY);
-
-        const encryptionKey = Buffer.from(encryptionKeyBase64, "base64");
-        const nonce = { data: Buffer.from(nonceBase64, "base64") };
-
-        // Load encrypted member state from file
-        const storedMemberState = await fetchFromFile(
-          MEMBER_STATE_FILENAME,
-          encryptionKey,
-          nonce,
-        );
-
-        if (!storedMemberState) {
-          throw new Error("Failed to load member state from file");
-        }
-
-        const loadedMember = Member.fromJSON(JSON.parse(storedMemberState));
-
-        console.log("Loaded member: ", loadedMember.credential.ecdhPublicKey);
-
-        setMember(loadedMember);
-        setCredentials(loadedMember.credential);
-        setPseudonym(loadedMember.pseudonym);
-      } catch {
-        // No member state exists, create new member
-        console.log("No member state found, creating new member");
-        await generateNewMember(generateRandomName());
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     initializeMember();
   }, []);
 
@@ -219,6 +217,7 @@ export const CredentialProvider: React.FC<{ children: ReactNode }> = ({
     const existingFile = new File(Paths.cache, MEMBER_STATE_FILENAME);
     if (existingFile.exists) {
       existingFile.delete();
+      initializeMember();
     }
   };
 

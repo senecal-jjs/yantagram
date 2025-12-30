@@ -130,6 +130,16 @@ class SQGroupMembersRepository implements GroupMembersRepository, Repository {
     }
   }
 
+  async deleteAll(): Promise<void> {
+    const statement = await this.db.prepareAsync("DELETE FROM group_members");
+
+    try {
+      await statement.executeAsync();
+    } finally {
+      await statement.finalizeAsync();
+    }
+  }
+
   private mapRowToGroupMember(row: {
     group_id: string;
     contact_id: number;

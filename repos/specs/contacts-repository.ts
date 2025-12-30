@@ -20,4 +20,5 @@ export default interface ContactsRepository {
   update(id: number, credentials: Partial<Credentials>): Promise<Contact>;
   delete(id: number): Promise<void>;
   exists(verificationKey: Uint8Array): Promise<boolean>;
+  deleteAll(): Promise<void>;
 }

@@ -19,6 +19,7 @@ interface ContactListProps {
   onContactSelect?: (contact: Contact) => void;
   onContactDeselect?: (contact: Contact) => void;
   selectedContactIds?: number[];
+  contactsToRemove?: number[];
 }
 
 export default function ContactList({
@@ -26,7 +27,8 @@ export default function ContactList({
   selectable = false,
   onContactSelect,
   onContactDeselect,
-  selectedContactIds = [],
+  selectedContactIds,
+  contactsToRemove,
 }: ContactListProps) {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -41,7 +43,11 @@ export default function ContactList({
     try {
       setIsLoading(true);
       const allContacts = await contactsRepo.getAll();
-      setContacts(allContacts);
+      setContacts(
+        allContacts.filter(
+          (contact) => !(contactsToRemove?.includes(contact.id) ?? false),
+        ),
+      );
     } catch (error) {
       console.error("Failed to load contacts:", error);
     } finally {
@@ -50,7 +56,8 @@ export default function ContactList({
   };
 
   const renderContact = ({ item }: { item: Contact }) => {
-    const isSelected = selectable && selectedContactIds.includes(item.id);
+    const isSelected =
+      selectable && (selectedContactIds?.includes(item.id) ?? false);
     const handlePress = () => {
       if (selectable) {
         if (isSelected) {

@@ -1,15 +1,16 @@
-import { Pressable, StyleSheet } from "react-native";
+import { StyleSheet } from "react-native";
+import { BounceButton } from "./bounce-button";
 import { IconSymbol } from "./icon-symbol";
 
 interface BackButtonProps {
-  onPress?: () => void;
+  onPress: () => void;
 }
 
 export function BackButton({ onPress }: BackButtonProps) {
   return (
-    <Pressable style={styles.backButton} onPress={onPress}>
+    <BounceButton style={styles.backButton} onPress={onPress}>
       <IconSymbol size={23} name="chevron.left" color={"white"} />
-    </Pressable>
+    </BounceButton>
   );
 }
 

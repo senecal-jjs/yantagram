@@ -8,21 +8,13 @@ export default function ModalLayout() {
       }}
     >
       <Stack.Screen
-        name="start-group"
+        name="start-settings"
         options={{
           headerShown: false,
         }}
       ></Stack.Screen>
       <Stack.Screen
-        name="select-group"
-        options={{
-          headerShown: false,
-          presentation: "card",
-          animation: "slide_from_right",
-        }}
-      ></Stack.Screen>
-      <Stack.Screen
-        name="name-group"
+        name="my-info"
         options={{
           headerShown: false,
           presentation: "card",
@@ -31,6 +23,14 @@ export default function ModalLayout() {
       ></Stack.Screen>
       <Stack.Screen
         name="security-privacy"
+        options={{
+          headerShown: false,
+          presentation: "card",
+          animation: "slide_from_right",
+        }}
+      ></Stack.Screen>
+      <Stack.Screen
+        name="message-retention"
         options={{
           headerShown: false,
           presentation: "card",

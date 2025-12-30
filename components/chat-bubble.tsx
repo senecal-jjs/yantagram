@@ -78,7 +78,7 @@ const styles = StyleSheet.create({
   },
   myMessageText: {
     color: "white",
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: 500,
   },
   pseudonymText: {
@@ -95,7 +95,7 @@ const styles = StyleSheet.create({
   },
   theirMessageText: {
     color: "white",
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: 500,
   },
   curlRight: {

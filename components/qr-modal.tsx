@@ -11,6 +11,7 @@ import { CameraView, useCameraPermissions } from "expo-camera";
 import React, { PropsWithChildren, useRef, useState } from "react";
 import { Alert, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
+import { BounceButton } from "./ui/bounce-button";
 
 type Props = PropsWithChildren<{
   showQRModal: boolean;
@@ -132,15 +133,12 @@ export default function QRModal({ showQRModal, handleClose }: Props) {
                 </Text>
               </Pressable>
             </View>
-            <Pressable
+            <BounceButton
               onPress={() => close()}
-              style={({ pressed }) => [
-                styles.closeIconButton,
-                pressed && styles.closeIconButtonPressed,
-              ]}
+              style={styles.closeIconButton}
             >
               <IconSymbol size={42} name="x.circle" color={"white"} />
-            </Pressable>
+            </BounceButton>
           </View>
 
           {/* Show QR Code View */}
@@ -251,6 +249,17 @@ const styles = StyleSheet.create({
     paddingLeft: 20,
     paddingRight: 20,
     borderRadius: 25,
+    borderTopWidth: 1,
+    borderLeftWidth: 1,
+    borderTopColor: "rgba(255, 255, 255, 0.15)",
+    borderLeftColor: "rgba(255, 255, 255, 0.15)",
+    shadowColor: "rgba(255, 255, 255, 0.1)",
+    shadowOffset: {
+      width: -1,
+      height: -1,
+    },
+    shadowOpacity: 1,
+    shadowRadius: 2,
   },
   qrText: {
     color: "white",
@@ -259,10 +268,8 @@ const styles = StyleSheet.create({
   },
   closeIconButton: {
     position: "absolute",
-    right: -100,
-  },
-  closeIconButtonPressed: {
-    transform: [{ scale: 1.2 }],
+    right: -180,
+    top: -42,
   },
   switchContainer: {
     flexDirection: "row",
