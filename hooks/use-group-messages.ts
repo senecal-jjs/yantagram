@@ -6,7 +6,6 @@ import { dbListener } from "@/repos/db-listener";
 import MessagesRepository from "@/repos/specs/messages-repository";
 import { MessageWithPseudonym } from "@/types/global";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Vibration } from "react-native";
 
 const PAGE_SIZE = 50;
 
@@ -72,18 +71,12 @@ export const useGroupMessages = (groupId: string) => {
     fetchMessages(true);
   }, [fetchMessages]);
 
-  const vibrateNow = () => {
-    // half second
-    Vibration.vibrate(500);
-  };
-
   useEffect(() => {
     // Initial fetch
     refresh();
 
     // Listen for database changes
     const handleMessageChange = () => {
-      vibrateNow();
       refresh();
     };
 
