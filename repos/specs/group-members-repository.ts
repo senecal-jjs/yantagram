@@ -13,4 +13,5 @@ export interface GroupMembersRepository {
   isMember(groupId: UUID, contactId: number): Promise<boolean>;
   removeAllFromGroup(groupId: UUID): Promise<void>;
   removeContactFromAllGroups(contactId: number): Promise<void>;
+  deleteAll(): Promise<void>;
 }

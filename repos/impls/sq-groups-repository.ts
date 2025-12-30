@@ -11,6 +11,17 @@ class SQGroupsRepository implements GroupsRepository, Repository {
     this.db = database;
   }
 
+  async deleteAll(): Promise<void> {
+    const statement = await this.db.prepareAsync("DELETE FROM groups");
+
+    try {
+      await statement.executeAsync();
+    } finally {
+      await statement.finalizeAsync();
+      dbListener.notifyGroupUpdate();
+    }
+  }
+
   async getSingleContactGroup(contactId: number): Promise<UUID | null> {
     const statement = await this.db.prepareAsync(
       `SELECT groups.id 

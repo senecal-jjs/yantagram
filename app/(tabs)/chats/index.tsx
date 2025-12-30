@@ -4,12 +4,14 @@ import { BounceButton } from "@/components/ui/bounce-button";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useCredentials } from "@/contexts/credential-context";
 import {
+  ContactsRepositoryToken,
   GroupsRepositoryToken,
   MessagesRepositoryToken,
   useRepos,
 } from "@/contexts/repository-context";
 import { useSettings } from "@/contexts/settings-context";
 import { dbListener } from "@/repos/db-listener";
+import ContactsRepository from "@/repos/specs/contacts-repository";
 import GroupsRepository from "@/repos/specs/groups-repository";
 import MessagesRepository from "@/repos/specs/messages-repository";
 import { useFocusEffect, useRouter } from "expo-router";
@@ -35,6 +37,7 @@ export default function TabTwoScreen() {
   const { getRepo } = useRepos();
   const groupsRepo = getRepo<GroupsRepository>(GroupsRepositoryToken);
   const messagesRepo = getRepo<MessagesRepository>(MessagesRepositoryToken);
+  const contactsRepo = getRepo<ContactsRepository>(ContactsRepositoryToken);
   const tapCount = useRef(0);
   const tapTimer = useRef<NodeJS.Timeout | null>(null);
 
@@ -49,6 +52,8 @@ export default function TabTwoScreen() {
       tapCount.current = 0;
       try {
         await messagesRepo.deleteAll();
+        await groupsRepo.deleteAll();
+        await contactsRepo.deleteAll();
         await deleteMember();
         await resetSettings();
         Alert.alert(
@@ -116,7 +121,9 @@ export default function TabTwoScreen() {
         rawTimestamp = lastMessageData[0].message.timestamp;
         timestamp = formatTimestamp(rawTimestamp);
       } else {
-        lastMessage = "You've been added to a group";
+        lastMessage = group.admin
+          ? "You started a group"
+          : "You've been added to a group";
         rawTimestamp = group.createdAt;
         timestamp = formatTimestamp(rawTimestamp);
       }
@@ -189,12 +196,20 @@ export default function TabTwoScreen() {
   return (
     <SafeAreaProvider>
       <SafeAreaView style={styles.mainContainer}>
+        <BounceButton style={styles.logoContainer} onPress={onSettingsPress}>
+          <View style={styles.logoButton}>
+            <View style={styles.logoAvatar}></View>
+            <Text style={styles.logoText}>Yantagram</Text>
+          </View>
+        </BounceButton>
+
         {conversations.length > 0 && (
           <FlatList
             data={conversations}
             showsVerticalScrollIndicator={false}
             keyExtractor={(item) => item.id}
             renderItem={renderItem}
+            style={{ marginTop: 70 }}
           />
         )}
         {conversations.length <= 0 && (
@@ -205,13 +220,6 @@ export default function TabTwoScreen() {
             </Text>
           </View>
         )}
-
-        <BounceButton style={styles.logoContainer} onPress={onSettingsPress}>
-          <View style={styles.logoButton}>
-            <View style={styles.logoAvatar}></View>
-            <Text style={styles.logoText}>Yantagram</Text>
-          </View>
-        </BounceButton>
 
         <View
           style={[
@@ -234,11 +242,7 @@ export default function TabTwoScreen() {
 
         <View style={styles.panicButtonContainer}>
           <BounceButton style={styles.panicButton} onPress={handlePanicButton}>
-            <IconSymbol
-              size={24}
-              name="exclamationmark.triangle.fill"
-              color={"#ff4444"}
-            ></IconSymbol>
+            <Text style={{ color: "red" }}>WIPE</Text>
           </BounceButton>
         </View>
 
@@ -262,7 +266,7 @@ const styles = StyleSheet.create({
   },
   logoContainer: {
     position: "absolute",
-    top: -180,
+    top: 20,
     left: 20,
     backgroundColor: "#272727ff",
     padding: 10,

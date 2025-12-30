@@ -27,7 +27,7 @@ export default function SecurityPrivacyScreen() {
             <Text style={styles.header}>Panic Mode</Text>
           </View>
           <Text style={styles.body}>
-            Triple tap the panic button to instantly delete all messages on your
+            Triple tap the WIPE button to instantly delete all messages on your
             device, along with your identity. This action is irreversible.
           </Text>
         </View>
