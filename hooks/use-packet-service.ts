@@ -30,9 +30,11 @@ import {
 import { BitchatPacket, FragmentType, PacketType } from "@/types/global";
 import { Mutex } from "@/utils/mutex";
 import { useEffect } from "react";
+import { useBloomFilter } from "./use-bloom-filter";
 import { useMessageSender } from "./use-message-sender";
 
 export function usePacketService() {
+  const { add, has } = useBloomFilter();
   const { getRepo } = useRepos();
   const incomingPacketsRepository = getRepo<IncomingPacketsRepository>(
     IncomingPacketsRepositoryToken,
@@ -67,6 +69,14 @@ export function usePacketService() {
    * @param packet A raw packet of bytes received over the mesh network.
    */
   const handleIncomingPacket = (packet: Uint8Array) => {
+    // check bloom filter to determine if packet has already been seen
+    if (has(packet)) {
+      return;
+    }
+
+    // add to bloom filter
+    add(packet);
+
     const decodedPacket = decode(packet);
 
     if (!decodedPacket) throw new Error("Failed to deserialize packet bytes");

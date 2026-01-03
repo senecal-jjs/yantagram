@@ -29,8 +29,8 @@ enum PacketType {
 }
 
 enum FragmentType {
-  AMIGO_WELCOME,
-  AMIGO_PATH_UPDATE,
+  AMIGO_WELCOME, // CGKA message
+  AMIGO_PATH_UPDATE, // CGKA message
   MESSAGE, // Chat message
 }
 
@@ -52,8 +52,7 @@ type MessageWithPseudonym = {
 };
 
 // The core packet structure for all BitChat protocol messages.
-// Encapsulates all data needed for routing through the mesh network,
-// including allowedHops for hop limiting and optional encryption.
+// Encapsulates all data needed for routing through the mesh network.
 // Note: Packets larger than BLE MTU (512 bytes) are automatically fragmented
 type BitchatPacket = {
   version: number;
