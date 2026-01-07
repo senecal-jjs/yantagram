@@ -32,11 +32,11 @@ import {
 import { BitchatPacket, FragmentType, PacketType } from "@/types/global";
 import { Mutex } from "@/utils/mutex";
 import { useEffect } from "react";
-import { useBloomFilter } from "./use-bloom-filter";
 import { useMessageSender } from "./use-message-sender";
+import { useTTLBloomFilter } from "./use-ttl-bloom-filter";
 
 export function usePacketService() {
-  const { add, has } = useBloomFilter();
+  const { add, has } = useTTLBloomFilter();
   const { getRepo } = useRepos();
   const incomingPacketsRepository = getRepo<IncomingPacketsRepository>(
     IncomingPacketsRepositoryToken,

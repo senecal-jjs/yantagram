@@ -44,6 +44,7 @@ class SQRelayPacketsRepository implements RelayPacketsRepository, Repository {
 
     try {
       const result = await statement.executeAsync<{
+        id: number;
         version: number;
         type: number;
         timestamp: number;
@@ -79,6 +80,7 @@ class SQRelayPacketsRepository implements RelayPacketsRepository, Repository {
 
     try {
       const result = await statement.executeAsync<{
+        id: number;
         version: number;
         type: number;
         timestamp: number;
@@ -99,7 +101,20 @@ class SQRelayPacketsRepository implements RelayPacketsRepository, Repository {
     }
   }
 
+  async updateAllowedHops(id: number, hops: number): Promise<void> {
+    const statement = await this.db.prepareAsync(
+      "UPDATE relay_packets SET allowed_hops = $hops WHERE id = $id",
+    );
+
+    try {
+      await statement.executeAsync({ $hops: hops, $id: id });
+    } finally {
+      await statement.finalizeAsync();
+    }
+  }
+
   private mapRowToRelayPacket(row: {
+    id: number;
     version: number;
     type: number;
     timestamp: number;
@@ -108,6 +123,7 @@ class SQRelayPacketsRepository implements RelayPacketsRepository, Repository {
     device_id: string;
   }): RelayPacket {
     return {
+      id: row.id,
       packet: {
         version: row.version,
         type: row.type,

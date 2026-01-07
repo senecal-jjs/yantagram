@@ -1,6 +1,7 @@
 import { BitchatPacket } from "@/types/global";
 
 export type RelayPacket = {
+  id: number;
   packet: BitchatPacket;
   deviceUUID: string;
 };
@@ -10,4 +11,5 @@ export default interface RelayPacketsRepository {
   getAll(): Promise<RelayPacket[]>;
   delete(id: number): Promise<void>;
   getEarliest(): Promise<RelayPacket | null>;
+  updateAllowedHops(id: number, hops: number): Promise<void>;
 }
