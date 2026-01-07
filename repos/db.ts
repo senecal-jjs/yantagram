@@ -128,21 +128,31 @@ async function migrateDb(db: SQLiteDatabase) {
       CREATE TABLE IF NOT EXISTS relay_packets (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         version INTEGER NOT NULL,
+        device_id TEXT NOT NULL,
         type INTEGER NOT NULL,
-        sender_id TEXT NOT NULL,
-        recipient_id TEXT NOT NULL,
         timestamp INTEGER NOT NULL,
         payload BLOB NOT NULL,
-        signature TEXT,
         allowed_hops INTEGER NOT NULL,
-        route BLOB NOT NULL,
         created_at INTEGER NOT NULL DEFAULT (round(unixepoch('subsec') * 1000))
       );
       
       CREATE INDEX idx_relay_packets_timestamp ON relay_packets(timestamp);
       CREATE INDEX idx_relay_packets_type ON relay_packets(type);
-      CREATE INDEX idx_relay_packets_sender_id ON relay_packets(sender_id);
       CREATE INDEX idx_relay_packets_created_at ON relay_packets(created_at);
+
+      CREATE TABLE IF NOT EXISTS connected_devices (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        device_uuid TEXT NOT NULL UNIQUE,
+        last_seen_rssi INTEGER,
+        is_connected INTEGER NOT NULL DEFAULT 0,
+        last_seen_at INTEGER NOT NULL DEFAULT (round(unixepoch('subsec') * 1000)),
+        created_at INTEGER NOT NULL DEFAULT (round(unixepoch('subsec') * 1000)),
+        updated_at INTEGER NOT NULL DEFAULT (round(unixepoch('subsec') * 1000))
+      );
+      
+      CREATE INDEX idx_connected_devices_device_uuid ON connected_devices(device_uuid);
+      CREATE INDEX idx_connected_devices_is_connected ON connected_devices(is_connected);
+      CREATE INDEX idx_connected_devices_last_seen_at ON connected_devices(last_seen_at);
 `);
     currentDbVersion = 1;
   }

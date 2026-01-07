@@ -6,6 +6,7 @@ import {
   GroupsRepositoryToken,
   IncomingPacketsRepositoryToken,
   MessagesRepositoryToken,
+  RelayPacketsRepositoryToken,
   useRepos,
 } from "@/contexts/repository-context";
 import ContactsRepository from "@/repos/specs/contacts-repository";
@@ -14,6 +15,7 @@ import { GroupMembersRepository } from "@/repos/specs/group-members-repository";
 import GroupsRepository from "@/repos/specs/groups-repository";
 import IncomingPacketsRepository from "@/repos/specs/incoming-packets-repository";
 import MessagesRepository from "@/repos/specs/messages-repository";
+import RelayPacketsRepository from "@/repos/specs/relay-packets-repository";
 import {
   AssembledData,
   extractFragmentMetadata,
@@ -52,6 +54,9 @@ export function usePacketService() {
   const contactsRepository = getRepo<ContactsRepository>(
     ContactsRepositoryToken,
   );
+  const relayPacketsRepository = getRepo<RelayPacketsRepository>(
+    RelayPacketsRepositoryToken,
+  );
   const { member, saveMember } = useCredentials();
   const { sendAmigoPathUpdate } = useMessageSender();
   const mutex = new Mutex();
@@ -67,8 +72,9 @@ export function usePacketService() {
    * stored in the [messages] table.
    *
    * @param packet A raw packet of bytes received over the mesh network.
+   * @param deviceUUID The bluetooth identifier of the device that send the packet
    */
-  const handleIncomingPacket = (packet: Uint8Array) => {
+  const handleIncomingPacket = (packet: Uint8Array, deviceUUID: string) => {
     // check bloom filter to determine if packet has already been seen
     if (has(packet)) {
       return;
@@ -86,6 +92,12 @@ export function usePacketService() {
 
     // Queue for async processing
     packetQueue.enqueue(decodedPacket);
+
+    // add to relay repository, packets are always added to the relay repository and re-broadcast
+    // this prevents an observer from determining that a packet arrived at its intended recipient
+    if (decodedPacket.allowedHops > 0) {
+      relayPacketsRepository.create(decodedPacket, deviceUUID);
+    }
   };
 
   /**

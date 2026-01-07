@@ -1,6 +1,8 @@
 import { BitchatPacket } from "@/types/global";
 import * as SQLite from "expo-sqlite";
-import RelayPacketsRepository from "../specs/relay-packets-repository";
+import RelayPacketsRepository, {
+  RelayPacket,
+} from "../specs/relay-packets-repository";
 import Repository from "../specs/repository";
 
 class SQRelayPacketsRepository implements RelayPacketsRepository, Repository {
@@ -10,10 +12,13 @@ class SQRelayPacketsRepository implements RelayPacketsRepository, Repository {
     this.db = database;
   }
 
-  async create(packet: BitchatPacket): Promise<BitchatPacket> {
+  async create(
+    packet: BitchatPacket,
+    deviceUUID: string,
+  ): Promise<BitchatPacket> {
     const statement = await this.db.prepareAsync(
-      `INSERT INTO relay_packets (version, type, timestamp, payload, allowed_hops) 
-       VALUES ($version, $type, $timestamp, $payload, $allowedHops)`,
+      `INSERT INTO relay_packets (version, type, timestamp, payload, allowed_hops, device_id) 
+       VALUES ($version, $type, $timestamp, $payload, $allowedHops, $deviceId)`,
     );
 
     try {
@@ -23,6 +28,7 @@ class SQRelayPacketsRepository implements RelayPacketsRepository, Repository {
         $timestamp: packet.timestamp,
         $payload: packet.payload,
         $allowedHops: packet.allowedHops,
+        $deviceId: deviceUUID,
       });
 
       return packet;
@@ -31,7 +37,7 @@ class SQRelayPacketsRepository implements RelayPacketsRepository, Repository {
     }
   }
 
-  async getAll(): Promise<BitchatPacket[]> {
+  async getAll(): Promise<RelayPacket[]> {
     const statement = await this.db.prepareAsync(
       "SELECT * FROM relay_packets ORDER BY created_at ASC",
     );
@@ -43,11 +49,12 @@ class SQRelayPacketsRepository implements RelayPacketsRepository, Repository {
         timestamp: number;
         payload: Uint8Array;
         allowed_hops: number;
+        device_id: string;
       }>();
 
       const rows = await result.getAllAsync();
 
-      return rows.map((row) => this.mapRowToPacket(row));
+      return rows.map((row) => this.mapRowToRelayPacket(row));
     } finally {
       await statement.finalizeAsync();
     }
@@ -65,7 +72,7 @@ class SQRelayPacketsRepository implements RelayPacketsRepository, Repository {
     }
   }
 
-  async getEarliest(): Promise<BitchatPacket | null> {
+  async getEarliest(): Promise<RelayPacket | null> {
     const statement = await this.db.prepareAsync(
       "SELECT * FROM relay_packets ORDER BY created_at ASC LIMIT 1",
     );
@@ -77,6 +84,7 @@ class SQRelayPacketsRepository implements RelayPacketsRepository, Repository {
         timestamp: number;
         payload: Uint8Array;
         allowed_hops: number;
+        device_id: string;
       }>();
 
       const row = await result.getFirstAsync();
@@ -85,25 +93,29 @@ class SQRelayPacketsRepository implements RelayPacketsRepository, Repository {
         return null;
       }
 
-      return this.mapRowToPacket(row);
+      return this.mapRowToRelayPacket(row);
     } finally {
       await statement.finalizeAsync();
     }
   }
 
-  private mapRowToPacket(row: {
+  private mapRowToRelayPacket(row: {
     version: number;
     type: number;
     timestamp: number;
     payload: Uint8Array;
     allowed_hops: number;
-  }): BitchatPacket {
+    device_id: string;
+  }): RelayPacket {
     return {
-      version: row.version,
-      type: row.type,
-      timestamp: row.timestamp,
-      payload: row.payload,
-      allowedHops: row.allowed_hops,
+      packet: {
+        version: row.version,
+        type: row.type,
+        timestamp: row.timestamp,
+        payload: row.payload,
+        allowedHops: row.allowed_hops,
+      },
+      deviceUUID: row.device_id,
     };
   }
 }

@@ -100,6 +100,7 @@ export function useMessageSender() {
     message: Uint8Array,
     fragmentType: FragmentType,
     packetType: PacketType,
+    blackoutDeviceUUIDs: string[] = [],
   ) => {
     const packets = buildPackets(message, fragmentType, packetType);
 
@@ -111,7 +112,7 @@ export function useMessageSender() {
           throw new Error("Failed to encode packet");
         }
 
-        await BleModule.broadcastPacketAsync(encoded);
+        await BleModule.broadcastPacketAsync(encoded, blackoutDeviceUUIDs);
 
         await sleep(100);
       }

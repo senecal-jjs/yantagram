@@ -1,3 +1,4 @@
+import SQConnectedDevicesRepository from "@/repos/impls/sq-connected-devices-repository";
 import SQContactsRepository from "@/repos/impls/sq-contacts-repository";
 import SQFragmentsRepository from "@/repos/impls/sq-fragments-repository";
 import SQGroupMembersRepository from "@/repos/impls/sq-group-members-repository";
@@ -23,6 +24,9 @@ export const IncomingPacketsRepositoryToken = Symbol(
   "IncomingPacketsRepository",
 );
 export const RelayPacketsRepositoryToken = Symbol("RelayPacketsRepository");
+export const ConnectedDevicesRepositoryToken = Symbol(
+  "ConnectedDevicesRepository",
+);
 
 interface RepositoryContextType {
   repos: Map<symbol, Repository>;
@@ -54,6 +58,10 @@ export const RepositoryProvider: React.FC<{ children: React.ReactNode }> = ({
       new SQIncomingPacketsRepository(db),
     );
     repoMap.set(RelayPacketsRepositoryToken, new SQRelayPacketsRepository(db));
+    repoMap.set(
+      ConnectedDevicesRepositoryToken,
+      new SQConnectedDevicesRepository(db),
+    );
     return repoMap;
   }, [db]);
 
