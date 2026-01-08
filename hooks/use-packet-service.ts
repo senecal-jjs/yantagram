@@ -35,7 +35,7 @@ import { useEffect } from "react";
 import { useMessageSender } from "./use-message-sender";
 import { useTTLBloomFilter } from "./use-ttl-bloom-filter";
 
-const MAX_RELAY_PACKETS = 100; // Maximum packets to retain in FIFO relay queue
+const MAX_RELAY_PACKETS = 500; // Maximum packets to retain in FIFO relay queue
 
 export function usePacketService() {
   const { add, has } = useTTLBloomFilter();
@@ -107,7 +107,7 @@ export function usePacketService() {
             `[PacketService] FIFO eviction: removed ${evicted} oldest packets (was ${currentCount}, max ${MAX_RELAY_PACKETS})`,
           );
         }
-        await relayPacketsRepository.create(decodedPacket, deviceUUID);
+        relayPacketsRepository.create(decodedPacket, deviceUUID);
       });
     }
   };
