@@ -35,6 +35,8 @@ import { useEffect } from "react";
 import { useMessageSender } from "./use-message-sender";
 import { useTTLBloomFilter } from "./use-ttl-bloom-filter";
 
+const MAX_RELAY_PACKETS = 100; // Maximum packets to retain in FIFO relay queue
+
 export function usePacketService() {
   const { add, has } = useTTLBloomFilter();
   const { getRepo } = useRepos();
@@ -96,7 +98,17 @@ export function usePacketService() {
     // add to relay repository, packets are always added to the relay repository and re-broadcast
     // this prevents an observer from determining that a packet arrived at its intended recipient
     if (decodedPacket.allowedHops > 0) {
-      relayPacketsRepository.create(decodedPacket, deviceUUID);
+      // FIFO eviction: check capacity and evict oldest packets before adding new one
+      relayPacketsRepository.count().then(async (currentCount) => {
+        if (currentCount >= MAX_RELAY_PACKETS) {
+          const toEvict = currentCount - MAX_RELAY_PACKETS + 1; // +1 to make room for new packet
+          const evicted = await relayPacketsRepository.deleteOldest(toEvict);
+          console.log(
+            `[PacketService] FIFO eviction: removed ${evicted} oldest packets (was ${currentCount}, max ${MAX_RELAY_PACKETS})`,
+          );
+        }
+        await relayPacketsRepository.create(decodedPacket, deviceUUID);
+      });
     }
   };
 

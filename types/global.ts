@@ -17,6 +17,7 @@ enum PacketType {
   ANNOUNCE, // "I'm here" with nickname
   MESSAGE, // Public chat message
   LEAVE, // "I'm leaving"
+  SYNC, // a sync message between peers, should not be relayed
 
   NOISE_HANDSHAKE, // Handshake (init or response determined by payload)
   NOISE_ENCRYPTED, // All encrypted payloads ( messages, receipts, etc.)
@@ -32,6 +33,7 @@ enum FragmentType {
   AMIGO_WELCOME, // CGKA message
   AMIGO_PATH_UPDATE, // CGKA message
   MESSAGE, // Chat message
+  SYNC, // a sync message between peers, should not be relayed
 }
 
 // Represents a user visible message in the BitChat system.

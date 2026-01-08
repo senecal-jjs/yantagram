@@ -133,12 +133,14 @@ async function migrateDb(db: SQLiteDatabase) {
         timestamp INTEGER NOT NULL,
         payload BLOB NOT NULL,
         allowed_hops INTEGER NOT NULL,
+        relayed INTEGER NOT NULL DEFAULT 0,
         created_at INTEGER NOT NULL DEFAULT (round(unixepoch('subsec') * 1000))
       );
       
       CREATE INDEX idx_relay_packets_timestamp ON relay_packets(timestamp);
       CREATE INDEX idx_relay_packets_type ON relay_packets(type);
       CREATE INDEX idx_relay_packets_created_at ON relay_packets(created_at);
+      CREATE INDEX idx_relay_packets_relayed ON relay_packets(relayed);
 
       CREATE TABLE IF NOT EXISTS connected_devices (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -156,6 +158,7 @@ async function migrateDb(db: SQLiteDatabase) {
 `);
     currentDbVersion = 1;
   }
+
   // if (currentDbVersion === 2) {
   //   Add more migrations
   // }

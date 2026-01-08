@@ -123,6 +123,78 @@ class SQRelayPacketsRepository implements RelayPacketsRepository, Repository {
     }
   }
 
+  async count(): Promise<number> {
+    const statement = await this.db.prepareAsync(
+      "SELECT COUNT(*) as count FROM relay_packets",
+    );
+
+    try {
+      const result = await statement.executeAsync<{ count: number }>();
+      const row = await result.getFirstAsync();
+      return row?.count ?? 0;
+    } finally {
+      await statement.finalizeAsync();
+    }
+  }
+
+  async deleteOldest(n: number): Promise<number> {
+    if (n <= 0) return 0;
+
+    const statement = await this.db.prepareAsync(
+      `DELETE FROM relay_packets WHERE id IN (
+        SELECT id FROM relay_packets ORDER BY created_at ASC LIMIT $n
+      )`,
+    );
+
+    try {
+      const result = await statement.executeAsync({ $n: n });
+      return result.changes;
+    } finally {
+      await statement.finalizeAsync();
+    }
+  }
+
+  async markRelayed(id: number): Promise<void> {
+    const statement = await this.db.prepareAsync(
+      "UPDATE relay_packets SET relayed = 1 WHERE id = $id",
+    );
+
+    try {
+      await statement.executeAsync({ $id: id });
+    } finally {
+      await statement.finalizeAsync();
+    }
+  }
+
+  async getEarliestUnrelayed(): Promise<RelayPacket | null> {
+    const statement = await this.db.prepareAsync(
+      "SELECT * FROM relay_packets WHERE relayed = 0 ORDER BY created_at ASC LIMIT 1",
+    );
+
+    try {
+      const result = await statement.executeAsync<{
+        id: number;
+        version: number;
+        type: number;
+        timestamp: number;
+        payload: Uint8Array;
+        allowed_hops: number;
+        device_id: string;
+        relayed: number;
+      }>();
+
+      const row = await result.getFirstAsync();
+
+      if (!row) {
+        return null;
+      }
+
+      return this.mapRowToRelayPacket(row);
+    } finally {
+      await statement.finalizeAsync();
+    }
+  }
+
   private mapRowToRelayPacket(row: {
     id: number;
     version: number;
@@ -131,6 +203,7 @@ class SQRelayPacketsRepository implements RelayPacketsRepository, Repository {
     payload: Uint8Array;
     allowed_hops: number;
     device_id: string;
+    relayed?: number;
   }): RelayPacket {
     return {
       id: row.id,
@@ -142,6 +215,7 @@ class SQRelayPacketsRepository implements RelayPacketsRepository, Repository {
         allowedHops: row.allowed_hops,
       },
       deviceUUID: row.device_id,
+      relayed: row.relayed === 1,
     };
   }
 }
