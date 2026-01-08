@@ -11,7 +11,7 @@ import { GroupMembersRepository } from "@/repos/specs/group-members-repository";
 import GroupsRepository, { Group } from "@/repos/specs/groups-repository";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-import { FlatList, StyleSheet, Text, View } from "react-native";
+import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 
 export default function GroupDetails() {
@@ -26,6 +26,7 @@ export default function GroupDetails() {
 
   const [group, setGroup] = useState<Group | null>(null);
   const [groupMembers, setGroupMembers] = useState<Contact[]>([]);
+  const [hasAvailableContacts, setHasAvailableContacts] = useState(true);
 
   useEffect(() => {
     async function fetchGroupData() {
@@ -38,6 +39,14 @@ export default function GroupDetails() {
 
       setGroup(fetchedGroup);
       setGroupMembers(contacts.filter((contact) => contact !== null));
+
+      // Check if there are any contacts not in the group
+      const allContacts = await contactsRepo.getAll();
+      const memberIds = new Set(members.map((m) => m.contactId));
+      const availableContacts = allContacts.filter(
+        (contact) => !memberIds.has(contact.id),
+      );
+      setHasAvailableContacts(availableContacts.length > 0);
     }
     fetchGroupData();
   }, [groupId]);
@@ -67,20 +76,39 @@ export default function GroupDetails() {
         </View>
         <View style={styles.modalContent}>
           {group && group.admin && (
-            <BounceButton style={styles.addMemberButton} onPress={onAddMember}>
+            <Pressable
+              style={[
+                styles.addMemberButton,
+                !hasAvailableContacts && styles.addMemberButtonDisabled,
+              ]}
+              onPress={onAddMember}
+              disabled={!hasAvailableContacts}
+            >
               <View style={styles.addMemberContainer}>
-                <View style={styles.addMemberAvatar}>
+                <View
+                  style={[
+                    styles.addMemberAvatar,
+                    !hasAvailableContacts && styles.addMemberAvatarDisabled,
+                  ]}
+                >
                   <IconSymbol
                     name="person.badge.plus"
                     size={20}
-                    color={"#0B93F6"}
+                    color={hasAvailableContacts ? "#0B93F6" : "#555"}
                   />
                 </View>
                 <View style={styles.addMemberInfo}>
-                  <Text style={styles.addMemberText}>Add Members</Text>
+                  <Text
+                    style={[
+                      styles.addMemberText,
+                      !hasAvailableContacts && styles.addMemberTextDisabled,
+                    ]}
+                  >
+                    Add Members
+                  </Text>
                 </View>
               </View>
-            </BounceButton>
+            </Pressable>
           )}
           <View style={styles.membersSection}>
             <Text style={styles.sectionTitle}>
@@ -133,6 +161,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#090909ff",
   },
+  addMemberButtonDisabled: {
+    opacity: 0.5,
+  },
   modalHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -171,6 +202,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginRight: 12,
+  },
+  addMemberAvatarDisabled: {
+    backgroundColor: "rgba(85, 85, 85, 0.2)",
+  },
+  addMemberTextDisabled: {
+    color: "#555",
   },
   addMemberInfo: {
     flex: 1,

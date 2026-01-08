@@ -33,6 +33,10 @@ import MessagesRepository from "@/repos/specs/messages-repository";
 import { Message, MessageWithPseudonym } from "@/types/global";
 import { uint8ArrayToHexString } from "@/utils/string";
 
+type MessageItem =
+  | { type: "message"; data: MessageWithPseudonym }
+  | { type: "dateSeparator"; timestamp: number; label: string };
+
 export default function Chat() {
   const router = useRouter();
   const { chatId } = useLocalSearchParams<{ chatId: string }>();
@@ -51,6 +55,82 @@ export default function Chat() {
   const contactsRepo = getRepo<ContactsRepository>(ContactsRepositoryToken);
   const messagesRepo = getRepo<MessagesRepository>(MessagesRepositoryToken);
   const flatListRef = useRef<FlatList>(null);
+
+  // Process messages with date separators
+  const messagesWithSeparators: MessageItem[] = React.useMemo(() => {
+    const items: MessageItem[] = [];
+    const threshold = 5 * 60 * 1000; // 5 minutes threshold
+
+    for (let i = 0; i < messages.length; i++) {
+      const currentMessage = messages[i];
+      const previousMessage = i > 0 ? messages[i - 1] : null;
+
+      // Check if we need a date separator
+      if (
+        !previousMessage ||
+        currentMessage.message.timestamp - previousMessage.message.timestamp >
+          threshold
+      ) {
+        const date = new Date(currentMessage.message.timestamp);
+        const now = Date.now();
+        const diff = now - currentMessage.message.timestamp;
+        const millisDay = 86_400_000;
+
+        let label = "";
+        if (
+          diff < millisDay &&
+          date.toDateString() === new Date().toDateString()
+        ) {
+          // Today - show time only
+          label = date.toLocaleTimeString("en-US", {
+            hour: "numeric",
+            minute: "2-digit",
+            hour12: true,
+          });
+        } else if (diff < millisDay * 7) {
+          // Less than a week - show day and time
+          label =
+            date.toLocaleDateString("en-US", { weekday: "long" }) +
+            " " +
+            date.toLocaleTimeString("en-US", {
+              hour: "numeric",
+              minute: "2-digit",
+              hour12: true,
+            });
+        } else {
+          // Older - show full date and time
+          label =
+            date.toLocaleDateString("en-US", {
+              month: "short",
+              day: "numeric",
+              year:
+                date.getFullYear() !== new Date().getFullYear()
+                  ? "numeric"
+                  : undefined,
+            }) +
+            " at " +
+            date.toLocaleTimeString("en-US", {
+              hour: "numeric",
+              minute: "2-digit",
+              hour12: true,
+            });
+        }
+
+        items.push({
+          type: "dateSeparator",
+          timestamp: currentMessage.message.timestamp,
+          label,
+        });
+      }
+
+      items.push({
+        type: "message",
+        data: currentMessage,
+      });
+    }
+
+    return items;
+  }, [messages]);
 
   useEffect(() => {
     async function getGroupName() {
@@ -77,13 +157,21 @@ export default function Chat() {
     getGroupName();
   }, [chatId]);
 
-  const renderMessage = ({ item }: { item: MessageWithPseudonym }) => {
+  const renderItem = ({ item }: { item: MessageItem }) => {
+    if (item.type === "dateSeparator") {
+      return (
+        <View style={styles.dateSeparatorContainer}>
+          <Text style={styles.dateSeparatorText}>{item.label}</Text>
+        </View>
+      );
+    }
+
     // mark as read, but don't notify listener to prevent re-render loop
-    messagesRepo.markAsRead(item.message.id, false);
+    messagesRepo.markAsRead(item.data.message.id, false);
     return (
       <ChatBubble
-        message={item.message}
-        contactPseudonym={item.pseudonym}
+        message={item.data.message}
+        contactPseudonym={item.data.pseudonym}
         showPseudonym={groupMembers.length > 1}
         verificationKey={uint8ArrayToHexString(
           member?.credential.verificationKey!,
@@ -170,10 +258,14 @@ export default function Chat() {
         >
           <FlatList
             ref={flatListRef}
-            data={messages}
+            data={messagesWithSeparators}
             showsVerticalScrollIndicator={true}
-            renderItem={renderMessage}
-            keyExtractor={(item) => item.message.id}
+            renderItem={renderItem}
+            keyExtractor={(item, index) =>
+              item.type === "message"
+                ? item.data.message.id
+                : `separator-${item.timestamp}-${index}`
+            }
             onContentSizeChange={() => {
               flatListRef.current?.scrollToEnd({ animated: true });
             }}
@@ -227,9 +319,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 20,
     paddingHorizontal: 15,
-    // backgroundColor: "rgba(38, 35, 35, 0.2)",
     position: "relative",
-    // opacity: 0.5,
   },
   headerCenter: {
     alignItems: "center",
@@ -334,5 +424,14 @@ const styles = StyleSheet.create({
   loadingFooter: {
     paddingVertical: 20,
     alignItems: "center",
+  },
+  dateSeparatorContainer: {
+    alignItems: "center",
+    marginVertical: 15,
+  },
+  dateSeparatorText: {
+    color: "#888",
+    fontSize: 12,
+    fontWeight: "500",
   },
 });

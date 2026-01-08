@@ -7,6 +7,7 @@ import {
   ContactsRepositoryToken,
   GroupsRepositoryToken,
   MessagesRepositoryToken,
+  RelayPacketsRepositoryToken,
   useRepos,
 } from "@/contexts/repository-context";
 import { useSettings } from "@/contexts/settings-context";
@@ -14,9 +15,20 @@ import { dbListener } from "@/repos/db-listener";
 import ContactsRepository from "@/repos/specs/contacts-repository";
 import GroupsRepository from "@/repos/specs/groups-repository";
 import MessagesRepository from "@/repos/specs/messages-repository";
+import RelayPacketsRepository from "@/repos/specs/relay-packets-repository";
 import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { Alert, FlatList, StyleSheet, Text, View } from "react-native";
+import {
+  Alert,
+  FlatList,
+  Keyboard,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 
 export type Conversation = {
@@ -34,10 +46,17 @@ export default function TabTwoScreen() {
   const { resetSettings } = useSettings();
   const [showQRModal, setShowQRModal] = useState(false);
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [keyboardOffset, setKeyboardOffset] = useState(0);
+  const [searchHighlight, setSearchHighlight] = useState(false);
+  const [dismissHighlight, setDismissHighlight] = useState(false);
   const { getRepo } = useRepos();
   const groupsRepo = getRepo<GroupsRepository>(GroupsRepositoryToken);
   const messagesRepo = getRepo<MessagesRepository>(MessagesRepositoryToken);
   const contactsRepo = getRepo<ContactsRepository>(ContactsRepositoryToken);
+  const relayPacketsRepo = getRepo<RelayPacketsRepository>(
+    RelayPacketsRepositoryToken,
+  );
   const tapCount = useRef(0);
   const tapTimer = useRef<NodeJS.Timeout | null>(null);
 
@@ -54,6 +73,7 @@ export default function TabTwoScreen() {
         await messagesRepo.deleteAll();
         await groupsRepo.deleteAll();
         await contactsRepo.deleteAll();
+        await relayPacketsRepo.deleteAll();
         await deleteMember();
         await resetSettings();
         Alert.alert(
@@ -157,11 +177,27 @@ export default function TabTwoScreen() {
     dbListener.onGroupUpdate(fetchConversations);
     dbListener.onMessageChange(fetchConversations);
 
+    // Keyboard listeners
+    const keyboardWillShow = Keyboard.addListener(
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow",
+      (e) => {
+        setKeyboardOffset(e.endCoordinates.height);
+      },
+    );
+    const keyboardWillHide = Keyboard.addListener(
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide",
+      () => {
+        setKeyboardOffset(0);
+      },
+    );
+
     // Cleanup listener on unmount
     return () => {
       dbListener.removeGroupCreationListener(fetchConversations);
       dbListener.removeGroupUpdateListener(fetchConversations);
       dbListener.removeMessageChangeListener(fetchConversations);
+      keyboardWillShow.remove();
+      keyboardWillHide.remove();
     };
   }, [fetchConversations]);
 
@@ -180,6 +216,10 @@ export default function TabTwoScreen() {
       pathname: "/(group-modal)/start-group",
     });
   };
+
+  const filteredConversations = conversations.filter((conversation) =>
+    conversation.name.toLowerCase().includes(searchQuery.toLowerCase()),
+  );
 
   const renderItem = ({ item }: { item: Conversation }) => (
     <ConversationItem
@@ -203,22 +243,105 @@ export default function TabTwoScreen() {
           </View>
         </BounceButton>
 
+        <View
+          style={[
+            styles.searchContainer,
+            {
+              bottom: keyboardOffset > 0 ? keyboardOffset - 70 : 20,
+              right: keyboardOffset > 0 ? 70 : undefined,
+              minWidth: keyboardOffset > 0 ? undefined : 200,
+              backgroundColor: searchHighlight
+                ? "rgba(60, 60, 60, 0.5)"
+                : keyboardOffset > 0
+                  ? "rgba(39, 39, 39, 0.95)"
+                  : "rgba(39, 39, 39, 0.3)",
+              shadowColor: searchHighlight
+                ? "#fff"
+                : "rgba(255, 255, 255, 0.1)",
+              shadowOpacity: searchHighlight ? 0.25 : 1,
+              shadowRadius: searchHighlight ? 5 : 2,
+            },
+          ]}
+        >
+          <IconSymbol
+            size={18}
+            name="magnifyingglass"
+            color="#888"
+            style={styles.searchIcon}
+          />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search chats..."
+            placeholderTextColor="#888"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            onPressIn={() => {
+              if (keyboardOffset === 0) {
+                setSearchHighlight(true);
+                setTimeout(() => setSearchHighlight(false), 150);
+              }
+            }}
+          />
+          {searchQuery.length > 0 && (
+            <Pressable
+              onPress={() => setSearchQuery("")}
+              style={styles.clearButton}
+            >
+              <IconSymbol size={20} name="xmark.circle.fill" color="#888" />
+            </Pressable>
+          )}
+        </View>
+
+        {keyboardOffset > 0 && (
+          <Pressable
+            onPress={() => Keyboard.dismiss()}
+            onPressIn={() => {
+              setDismissHighlight(true);
+              setTimeout(() => setDismissHighlight(false), 150);
+            }}
+            style={[
+              styles.dismissButtonContainer,
+              {
+                bottom: keyboardOffset > 0 ? keyboardOffset - 70 : 20,
+                backgroundColor: dismissHighlight
+                  ? "rgba(150, 150, 150, 0.95)"
+                  : "rgba(39, 39, 39, 0.95)",
+                shadowColor: dismissHighlight
+                  ? "#fff"
+                  : "rgba(255, 255, 255, 0.1)",
+                shadowOpacity: dismissHighlight ? 0.6 : 1,
+                shadowRadius: dismissHighlight ? 10 : 2,
+              },
+            ]}
+          >
+            <IconSymbol
+              size={24}
+              name="keyboard.chevron.compact.down"
+              color="#888"
+            />
+          </Pressable>
+        )}
+
         {conversations.length > 0 && (
           <FlatList
-            data={conversations}
+            data={filteredConversations}
             showsVerticalScrollIndicator={false}
             keyExtractor={(item) => item.id}
             renderItem={renderItem}
             style={{ marginTop: 70 }}
+            contentContainerStyle={{ paddingBottom: 100 }}
           />
         )}
         {conversations.length <= 0 && (
-          <View style={styles.emptyContainer}>
+          <Pressable
+            style={styles.emptyContainer}
+            onPress={() => Keyboard.dismiss()}
+          >
             <Text style={styles.emptyText}>No chats yet</Text>
             <Text style={styles.emptySubtext}>
               Tap the new message icon to start a chat
             </Text>
-          </View>
+          </Pressable>
         )}
 
         <View
@@ -282,6 +405,8 @@ const styles = StyleSheet.create({
     },
     shadowOpacity: 1,
     shadowRadius: 2,
+    zIndex: 1001,
+    elevation: 1001,
   },
   logoAvatar: {
     width: 25,
@@ -297,6 +422,64 @@ const styles = StyleSheet.create({
     fontWeight: 600,
     fontSize: 14,
   },
+  searchContainer: {
+    position: "absolute",
+    bottom: 20,
+    left: 20,
+    backgroundColor: "rgba(39, 39, 39, 0.3)",
+    borderRadius: 20,
+    borderTopWidth: 1,
+    borderLeftWidth: 1,
+    borderTopColor: "rgba(255, 255, 255, 0.15)",
+    borderLeftColor: "rgba(255, 255, 255, 0.15)",
+    shadowColor: "rgba(255, 255, 255, 0.1)",
+    shadowOffset: {
+      width: -1,
+      height: -1,
+    },
+    shadowOpacity: 1,
+    shadowRadius: 2,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    minWidth: 200,
+    height: 53,
+    zIndex: 1000,
+    elevation: 1000,
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    color: "white",
+    fontSize: 16,
+  },
+  clearButton: {
+    marginLeft: 8,
+    padding: 2,
+  },
+  dismissButtonContainer: {
+    position: "absolute",
+    left: 330,
+    borderRadius: 20,
+    borderTopWidth: 1,
+    borderLeftWidth: 1,
+    borderTopColor: "rgba(255, 255, 255, 0.15)",
+    borderLeftColor: "rgba(255, 255, 255, 0.15)",
+    shadowColor: "rgba(255, 255, 255, 0.1)",
+    shadowOffset: {
+      width: -1,
+      height: -1,
+    },
+    shadowOpacity: 1,
+    shadowRadius: 2,
+    width: 50,
+    height: 53,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   floatingButtonBottomRight: {
     position: "absolute",
     bottom: 20,
@@ -309,8 +492,8 @@ const styles = StyleSheet.create({
   },
   panicButtonContainer: {
     position: "absolute",
-    bottom: 20,
-    left: 20,
+    top: 68,
+    right: 20,
   },
   panicButton: {
     width: 50,
@@ -369,10 +552,11 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   emptyContainer: {
+    flex: 1,
     alignItems: "center",
-    paddingVertical: 60,
+    justifyContent: "center",
     paddingHorizontal: 10,
-    marginTop: 30,
+    marginTop: 70,
   },
   emptyText: {
     fontSize: 18,

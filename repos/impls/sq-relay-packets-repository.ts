@@ -73,6 +73,16 @@ class SQRelayPacketsRepository implements RelayPacketsRepository, Repository {
     }
   }
 
+  async deleteAll(): Promise<void> {
+    const statement = await this.db.prepareAsync("DELETE FROM relay_packets");
+
+    try {
+      await statement.executeAsync();
+    } finally {
+      await statement.finalizeAsync();
+    }
+  }
+
   async getEarliest(): Promise<RelayPacket | null> {
     const statement = await this.db.prepareAsync(
       "SELECT * FROM relay_packets ORDER BY created_at ASC LIMIT 1",

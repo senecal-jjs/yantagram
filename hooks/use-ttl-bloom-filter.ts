@@ -43,7 +43,7 @@ export function useTTLBloomFilter() {
             totalEntries: stats.totalEntries,
             activeEntries: stats.activeEntries,
             expiredEntries: stats.expiredEntries,
-            ttlMs: `${stats.ttlMs / 1000}s`,
+            ttl: `${stats.ttlMs / 1000}s`,
           });
 
           // Prune any expired entries that accumulated while offline

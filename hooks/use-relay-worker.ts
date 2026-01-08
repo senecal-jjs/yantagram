@@ -37,67 +37,73 @@ export function useRelayWorker() {
         return;
       }
 
-      isProcessingRef.current = true;
+      // Schedule high-impact work during idle time
+      const requestIdleCallback =
+        global.requestIdleCallback || ((cb) => setTimeout(cb, 1));
 
-      try {
-        const relayEntry = await relayPacketsRepo.getEarliest();
-
-        if (!relayEntry) {
-          return;
-        }
-
-        const { id, packet, deviceUUID } = relayEntry;
-
-        // Check if packet should still be relayed
-        if (packet.allowedHops <= 0) {
-          console.log(
-            `[Relay] Packet ${id} expired (hops: ${packet.allowedHops}), removing`,
-          );
-          await relayPacketsRepo.delete(id);
-          return;
-        }
-
-        // Decrement hops
-        const newHops = packet.allowedHops - 1;
-        const updatedPacket = {
-          ...packet,
-          allowedHops: newHops,
-        };
-
-        console.log(
-          `[Relay] Rebroadcasting packet ${id} (type: ${packet.type}, hops: ${packet.allowedHops} → ${newHops})`,
-        );
+      requestIdleCallback(async () => {
+        isProcessingRef.current = true;
 
         try {
-          // Encode the packet with decremented hops
-          const encoded = encode(updatedPacket);
+          const relayEntry = await relayPacketsRepo.getEarliest();
 
-          if (!encoded) {
-            console.error(`[Relay] Failed to encode packet ${id}`);
+          if (!relayEntry) {
+            return;
+          }
+
+          const { id, packet, deviceUUID } = relayEntry;
+
+          // Check if packet should still be relayed
+          if (packet.allowedHops <= 0) {
+            console.log(
+              `[Relay] Packet ${id} expired (hops: ${packet.allowedHops}), removing`,
+            );
             await relayPacketsRepo.delete(id);
             return;
           }
 
-          // Broadcast to all devices EXCEPT the device that sent us this packet
-          // This prevents packets from bouncing back to their sender
-          await BleModule.broadcastPacketAsync(encoded, [deviceUUID]);
+          // Decrement hops
+          const newHops = packet.allowedHops - 1;
+          const updatedPacket = {
+            ...packet,
+            allowedHops: newHops,
+          };
 
-          console.log(`[Relay] Successfully relayed packet ${id}`);
+          console.log(
+            `[Relay] Rebroadcasting packet ${id} (type: ${packet.type}, hops: ${packet.allowedHops} → ${newHops})`,
+          );
 
-          // Add delay to avoid flooding the network
-          await sleep(RELAY_DELAY_MS);
+          try {
+            // Encode the packet with decremented hops
+            const encoded = encode(updatedPacket);
+
+            if (!encoded) {
+              console.error(`[Relay] Failed to encode packet ${id}`);
+              await relayPacketsRepo.delete(id);
+              return;
+            }
+
+            // Broadcast to all devices EXCEPT the device that sent us this packet
+            // This prevents packets from bouncing back to their sender
+            await BleModule.broadcastPacketAsync(encoded, [deviceUUID]);
+
+            console.log(`[Relay] Successfully relayed packet ${id}`);
+
+            // Add delay to avoid flooding the network
+            await sleep(RELAY_DELAY_MS);
+          } catch (error) {
+            console.error(`[Relay] Failed to broadcast packet ${id}:`, error);
+          } finally {
+            // Always delete after attempting to relay
+            // If broadcast failed, packet is lost (eventual consistency)
+            await relayPacketsRepo.delete(id);
+          }
         } catch (error) {
-          console.error(`[Relay] Failed to broadcast packet ${id}:`, error);
+          console.error("[Relay] Error processing relay queue:", error);
         } finally {
-          // Always delete after attempting to relay
-          // If broadcast failed, packet is lost (eventual consistency)
-          await relayPacketsRepo.delete(id);
+          isProcessingRef.current = false;
         }
-      } catch (error) {
-        console.error("[Relay] Error processing relay queue:", error);
-      } finally {
-        isProcessingRef.current = false;
-      }
+      });
     };
 
     // Start the relay worker

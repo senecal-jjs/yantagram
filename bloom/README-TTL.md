@@ -1,47 +1,45 @@
-# TTL Bloom Filter with Counting Bloom Filter
+# Bloom Filter TTL/Expiration Approaches
 
 ## Overview
-When implementing a flooding protocol over a BLE mesh network, bloom filters prevent duplicate packet processing. However, without expiration, the filter grows indefinitely and old packets are remembered forever. This implementation uses a Counting Bloom Filter to enable true removal of expired entries without rebuilding.
+When implementing a flooding protocol over a BLE mesh network, bloom filters prevent duplicate packet processing. However, without expiration, the filter grows indefinitely and old packets are remembered forever. Two main approaches exist for adding TTL support.
 
 ---
 
-## Time-Stamped Bloom Filter with Counting Support
+## Approach 1: Time-Stamped Bloom Filter
 
 **File**: `bloom/ttl-bloom-filter.ts`
 
 ### How It Works
-- Uses a **Counting Bloom Filter** that maintains counters for each bit position
 - Stores each packet hash with its insertion timestamp in a Map
 - Checks timestamps on lookup to determine if entries have expired
-- **True removal** via counter decrements (no rebuild needed!)
-- Periodically prunes expired entries using the counting filter's remove() method
+- Periodically prunes expired entries and rebuilds the bloom filter
 
 ### Pros
 ✅ Per-item expiration granularity (exact TTL per packet)  
 ✅ Simple mental model - each packet has its own lifetime  
 ✅ Can query exact statistics (how many expired vs active)  
-✅ **True removal support** - no rebuild needed ⭐  
-✅ Maintains optimal false positive rate after removals  
 ✅ Can adjust TTL dynamically per packet if needed  
 
 ### Cons
-❌ Higher memory overhead (stores timestamp + counting filter)  
+❌ Higher memory overhead (stores timestamp for every hash)  
 ❌ Requires periodic pruning operation  
+❌ Pruning requires rebuilding the entire bloom filter  
+❌ Can't truly remove from bloom filter (need to rebuild)  
+❌ More complex implementation  
 
 ### Memory Usage
 ```
-Counting Bloom filter: ~2.4KB (for 1000 items, 0.01 error rate, 4-bit counters)
+Bloom filter: ~1.2KB (for 1000 items, 0.01 error rate)
 Timestamp map: ~40 bytes per entry × number of packets
-Element references: ~32 bytes per entry (for removal support)
-Example: 500 packets = ~36KB additional memory
-Total: ~38.4KB for 500 concurrent packets
+Example: 500 packets = ~20KB additional memory
+Total: ~21KB for 500 concurrent packets
 ```
 
 ### Use Cases
 - When precise expiration is critical
 - When packet arrival patterns are unpredictable
-- BLE mesh networks with moderate packet rates
-- When maintaining optimal false positive rate is important
+- When you need detailed statistics about entry ages
+- Smaller networks with predictable load
 
 ### Example Usage
 ```typescript
@@ -55,41 +53,126 @@ filter.add(packetBytes);
 filter.has(packetBytes);  // Checks expiration automatically
 
 // Periodic cleanup (e.g., every minute)
-// Uses counting bloom filter for true removal - no rebuild!
 setInterval(() => {
-  const removed = filter.pruneExpired();
-  console.log(`Removed ${removed} expired entries`);
+  filter.pruneExpired();
 }, 60 * 1000);
-
-// Check statistics
-const stats = filter.stats();
-console.log(`Active: ${stats.activeEntries}, FP rate: ${stats.falsePositiveRate}`);
 ```
 
 ---
 
-## Key Features
+## Approach 2: Rotating Bloom Filters ⭐ **Recommended**
 
-### True Removal via Counting Bloom Filter
-Unlike traditional bloom filters, this implementation uses a **Counting Bloom Filter** which maintains counters at each bit position. This enables:
+**Files**: 
+- `bloom/rotating-bloom-filter.ts`
+- `hooks/use-rotating-bloom-filter.ts`
 
-- **O(k) removal** by decrementing counters (k = number of hash functions)
-- **No rebuild needed** - expired entries are truly removed
-- **Maintains false positive rate** - filter doesn't degrade over time
-- **Efficient pruning** - batch remove expired entries without reconstruction
+### How It Works
+- Maintains N bloom filters (e.g., 3 filters)
+- Each filter represents a time window (e.g., 2 minutes)
+- Periodically rotates: discard oldest, create fresh current
+- Lookups check all active filters
 
-### How Counting Bloom Filter Works
-```typescript
-// Traditional Bloom Filter
-// - Can only add (set bit to 1)
-// - Cannot remove (can't know if other items share the bit)
+### Pros
+✅ Lower memory overhead (no timestamp storage)  
+✅ Predictable, constant memory usage  
+✅ Simple rotation logic  
+✅ No rebuild needed (just discard oldest)  
+✅ Better performance (no timestamp lookups)  
+✅ Natural time-based partitioning  
+✅ Easier to reason about in distributed systems  
 
-// Counting Bloom Filter
-// - Adds: increment counter at hash positions
-// - Removes: decrement counter at hash positions
-// - Bit is "set" if counter > 0
-// - Enables true removal!
+### Cons
+❌ Coarser expiration granularity (by window, not per-item)  
+❌ Items may live slightly longer than exact TTL  
+❌ Can't know precise age of individual entries  
+❌ Requires checking multiple filters on lookup  
+
+### Memory Usage
 ```
+Per filter: ~1.2KB (for 500 items, 0.01 error rate)
+3 filters: ~3.6KB total
+No timestamp storage needed
+Total: ~4KB for any number of packets within capacity
+```
+
+### Configuration Example
+```
+3 filters × 2-minute windows = 6-minute total TTL
+
+Filter 0 (current):  Items from 0-2 mins ago     [write/read]
+Filter 1 (previous): Items from 2-4 mins ago     [read only]
+Filter 2 (oldest):   Items from 4-6 mins ago     [read only]
+
+After 2 minutes:
+- Discard Filter 2
+- Shift: Filter 1 → Filter 2, Filter 0 → Filter 1
+- Create new empty Filter 0
+```
+
+### Use Cases
+- Mesh networks with consistent packet rates
+- Memory-constrained devices (BLE mesh)
+- When window-based expiration is acceptable
+- Most production scenarios ⭐
+
+### Example Usage
+```typescript
+const filter = RotatingBloomFilter.create(
+  500,              // items per window
+  0.01,             // 1% error rate
+  3,                // number of rotating filters
+  2 * 60 * 1000     // 2-minute windows
+);
+
+filter.add(packetBytes);  // Auto-rotates if needed
+filter.has(packetBytes);  // Checks all windows
+
+const stats = filter.stats();
+console.log(`Total TTL: ${stats.totalTTL / 1000}s`);
+```
+
+---
+
+## Comparison Table
+
+| Aspect | Time-Stamped | Rotating |
+|--------|--------------|----------|
+| **Memory Overhead** | High (~40 bytes/item) | Low (fixed) |
+| **Expiration Precision** | Exact (per-item) | Coarse (per-window) |
+| **Lookup Speed** | O(k) + Map lookup | O(n×k) where n = filters |
+| **Cleanup Cost** | Rebuild filter | Discard filter (cheap) |
+| **Memory Growth** | Linear with items | Constant |
+| **Implementation Complexity** | Higher | Lower |
+| **BLE Mesh Suitability** | Moderate | **High** ⭐ |
+
+---
+
+## Recommendation for BitChat BLE Mesh
+
+**Use Rotating Bloom Filters** for these reasons:
+
+1. **Memory Constrained**: Mobile devices benefit from predictable memory usage
+2. **Natural Fit**: 2-minute windows align well with BLE mesh dynamics
+3. **Simpler Operations**: No expensive rebuilds needed
+4. **Sufficient Precision**: Window-based expiration is fine for flooding protocols
+5. **Better Performance**: No timestamp lookups on hot path
+
+### Suggested Configuration
+```typescript
+// 3 filters × 2 minutes = 6 minute total TTL
+// Expected ~300 packets/minute in a typical mesh
+const filter = RotatingBloomFilter.create(
+  500,              // packets per 2-minute window
+  0.01,             // 1% false positive rate
+  3,                // 3 rotating filters
+  2 * 60 * 1000     // 2-minute windows
+);
+```
+
+This gives 6 minutes of duplicate detection, which is:
+- Long enough to prevent loops in typical mesh topologies
+- Short enough to allow re-gossip if network partitions heal
+- Memory-efficient (~4KB vs ~20KB+ for timestamped approach)
 
 ---
 
@@ -102,20 +185,18 @@ If currently using basic BloomFilter:
 const filter = new BloomFilter(1000, 4);
 ```
 
-### After
+### After (Rotating)
 ```typescript
-import { useTTLBloomFilter } from "@/hooks/use-ttl-bloom-filter";
+import { useRotatingBloomFilter } from "@/hooks/use-rotating-bloom-filter";
 
 // In your component
-const { add, has, getStats } = useTTLBloomFilter();
+const { add, has, getStats } = useRotatingBloomFilter();
 ```
 
 The hook handles:
-- ✅ Automatic pruning
+- ✅ Automatic rotation
 - ✅ Persistence to disk
 - ✅ Statistics logging
-- ✅ Lifecycle management
-- ✅ True removal via counting bloom filter
 - ✅ Lifecycle management
 
 ---
@@ -145,35 +226,3 @@ expect(filter.has("very-old-packet")).toBe(false);
 - Constant memory: **~4KB always** ✅
 - Auto-cleanup every 2 minutes: **Zero performance impact** ✅
 - Packets expire: **Network can heal and re-sync** ✅
-Use fake timers in tests
-jest.useFakeTimers();
-
-const filter = TTLBloomFilter.create(100, 0.01, 5000); // 5s TTL
-
-filter.add("packet1");
-expect(filter.has("packet1")).toBe(true);
-
-// Advance time past TTL
-jest.advanceTimersByTime(6000);
-
-// Access triggers automatic removal
-expect(filter.has("packet1")).toBe(false);
-
-// Or prune manually
-const removed = filter.pruneExpired();
-expect(removed).toBe(0); // Already removed on access
-```
-
----
-
-## Performance Impact
-
-### Without TTL
-- Memory grows indefinitely: **Bad for long-running apps** ❌
-- Old packets forever remembered: **Can't re-gossip after partition** ❌
-- Filter degrades over time: **False positive rate increases** ❌
-
-### With TTL Counting Bloom Filter
-- Predictable memory: **~38KB for 500 packets** ✅
-- Auto-cleanup with true removal: **No rebuild cost** ✅
-- Maintains false positive rate: **Optimal performance
