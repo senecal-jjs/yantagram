@@ -69,7 +69,8 @@ export default function NameGroupScreen() {
       // Save updated member state with new group
       await saveMember();
 
-      const group = await groupsRepo.create(groupId, groupName, true);
+      // Group chats are expandable
+      const group = await groupsRepo.create(groupId, groupName, true, true);
 
       selectedMembers.forEach((selection) => {
         groupMembersRepo.add(group.id, selection.id);

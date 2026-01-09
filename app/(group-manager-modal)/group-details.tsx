@@ -69,13 +69,16 @@ export default function GroupDetails() {
     <SafeAreaProvider>
       <SafeAreaView style={styles.modalContainer}>
         <View style={styles.modalHeader}>
-          <Text style={styles.modalTitle}>Group Details</Text>
+          <Text style={styles.modalTitle}>
+            {group?.expandable ? "Group Details" : "Chat Details"}
+          </Text>
           <BounceButton onPress={onClose}>
             <IconSymbol size={42} name="x.circle" color={"white"} />
           </BounceButton>
         </View>
         <View style={styles.modalContent}>
-          {group && group.admin && (
+          {/* Hide add member button for non-expandable groups (private 1:1 chats) */}
+          {group && group.admin && group.expandable && (
             <Pressable
               style={[
                 styles.addMemberButton,

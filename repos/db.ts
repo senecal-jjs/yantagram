@@ -90,6 +90,7 @@ async function migrateDb(db: SQLiteDatabase) {
         id TEXT PRIMARY KEY NOT NULL,
         name TEXT NOT NULL,
         admin INTEGER NOT NULL DEFAULT 0,
+        expandable INTEGER NOT NULL DEFAULT 1,
         last_active_at INTEGER NOT NULL DEFAULT (round(unixepoch('subsec') * 1000)),
         created_at INTEGER NOT NULL DEFAULT (round(unixepoch('subsec') * 1000)),
         updated_at INTEGER NOT NULL DEFAULT (round(unixepoch('subsec') * 1000))

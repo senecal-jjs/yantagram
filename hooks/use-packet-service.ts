@@ -234,6 +234,7 @@ export function usePacketService() {
         pathUpdate.treeInfo.groupName,
         groupName,
         false,
+        pathUpdate.treeInfo.expandable ?? true,
       );
 
       for (const credential of pathUpdate.treeInfo.credentials) {

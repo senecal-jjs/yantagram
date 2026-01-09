@@ -47,8 +47,8 @@ export default function StartMessageScreen() {
         // members of the group can give the group whatever name they want on their own device
         const groupId = randomUUID();
 
-        // Create the group with TreeKEM
-        member.createGroup(groupCapacity, groupId, 1);
+        // Create the group with TreeKEM (not expandable for 1:1 chats)
+        member.createGroup(groupCapacity, groupId, 1, false);
 
         // add creator to the group
         await member.addToGroup(groupId);
@@ -56,7 +56,8 @@ export default function StartMessageScreen() {
         // Save update member state with new group
         await saveMember();
 
-        const group = await groupsRepo.create(groupId, contact.pseudonym, true);
+        // Private 1:1 chats are not expandable
+        const group = await groupsRepo.create(groupId, contact.pseudonym, true, false);
 
         sendWelcomeMessage(contact, member, group.id);
 

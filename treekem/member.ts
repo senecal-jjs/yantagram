@@ -34,11 +34,13 @@ export class Group {
   threshold: number;
   admins: number[];
   ratchetTree: BinaryTree;
+  expandable: boolean;
 
-  constructor(threshold: number, tree: BinaryTree) {
+  constructor(threshold: number, tree: BinaryTree, expandable: boolean = true) {
     this.threshold = threshold;
     this.admins = [];
     this.ratchetTree = tree;
+    this.expandable = expandable;
   }
 }
 
@@ -170,9 +172,14 @@ export class Member {
   /**
    * Create a new group
    */
-  createGroup(size: number, name: string, threshold: number): void {
+  createGroup(
+    size: number,
+    name: string,
+    threshold: number,
+    expandable: boolean = true,
+  ): void {
     const tree = BinaryTree.generate(size);
-    const group = new Group(threshold, tree);
+    const group = new Group(threshold, tree, expandable);
     group.admins.push(size); // Creator is admin by default
     this.groups.set(name, group);
   }
@@ -244,6 +251,7 @@ export class Member {
       capacity: group.ratchetTree.capacity,
       threshold: group.threshold,
       admins: group.admins,
+      expandable: group.expandable,
       actionMemberCred: cred,
     };
 
@@ -357,7 +365,11 @@ export class Member {
     console.log("decrypted tree");
     console.log(tree);
 
-    const group = new Group(treeInfo.threshold, tree);
+    const group = new Group(
+      treeInfo.threshold,
+      tree,
+      treeInfo.expandable ?? true,
+    );
     group.admins = treeInfo.admins;
     this.groups.set(treeInfo.groupName, group);
 
@@ -977,12 +989,14 @@ export class Member {
         capacity: group.ratchetTree.capacity,
         threshold: group.threshold,
         admins: group.admins,
+        expandable: group.expandable,
         actionMemberCred: this.credential,
       };
 
       const serializedGroup: SerializedGroup = {
         threshold: group.threshold,
         admins: [...group.admins],
+        expandable: group.expandable,
         ratchetTree: serializedTree,
       };
 
@@ -1045,7 +1059,11 @@ export class Member {
         new Map(serializedGroup.ratchetTree.credentials),
         serializedGroup.ratchetTree.capacity,
       );
-      const group = new Group(serializedGroup.threshold, tree);
+      const group = new Group(
+        serializedGroup.threshold,
+        tree,
+        serializedGroup.expandable ?? true,
+      );
       group.admins = [...serializedGroup.admins];
       member.groups.set(groupName, group);
     }

@@ -49,9 +49,10 @@ class SQGroupsRepository implements GroupsRepository, Repository {
     id: UUID,
     name: string,
     asAdmin: boolean = false,
+    expandable: boolean = true,
   ): Promise<Group> {
     const statement = await this.db.prepareAsync(
-      `INSERT INTO groups (id, name, admin) VALUES ($id, $name, $admin)`,
+      `INSERT INTO groups (id, name, admin, expandable) VALUES ($id, $name, $admin, $expandable)`,
     );
 
     try {
@@ -59,6 +60,7 @@ class SQGroupsRepository implements GroupsRepository, Repository {
         $id: id,
         $name: name,
         $admin: asAdmin,
+        $expandable: expandable,
       });
 
       // Fetch the created group
@@ -230,6 +232,7 @@ class SQGroupsRepository implements GroupsRepository, Repository {
     id: string;
     name: string;
     admin: number;
+    expandable: number;
     last_active_at: number;
     created_at: number;
     updated_at: number;
@@ -238,6 +241,7 @@ class SQGroupsRepository implements GroupsRepository, Repository {
       id: row.id,
       name: row.name,
       admin: row.admin === 1,
+      expandable: row.expandable === 1,
       lastActiveAt: row.last_active_at,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
