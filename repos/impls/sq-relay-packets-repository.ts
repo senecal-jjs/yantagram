@@ -1,6 +1,8 @@
 import { BitchatPacket } from "@/types/global";
 import * as SQLite from "expo-sqlite";
-import RelayPacketsRepository from "../specs/relay-packets-repository";
+import RelayPacketsRepository, {
+  RelayPacket,
+} from "../specs/relay-packets-repository";
 import Repository from "../specs/repository";
 
 class SQRelayPacketsRepository implements RelayPacketsRepository, Repository {
@@ -10,23 +12,23 @@ class SQRelayPacketsRepository implements RelayPacketsRepository, Repository {
     this.db = database;
   }
 
-  async create(packet: BitchatPacket): Promise<BitchatPacket> {
+  async create(
+    packet: BitchatPacket,
+    deviceUUID: string,
+  ): Promise<BitchatPacket> {
     const statement = await this.db.prepareAsync(
-      `INSERT INTO relay_packets (version, type, sender_id, recipient_id, timestamp, payload, signature, allowed_hops, route) 
-       VALUES ($version, $type, $senderId, $recipientId, $timestamp, $payload, $signature, $allowedHops, $route)`,
+      `INSERT INTO relay_packets (version, type, timestamp, payload, allowed_hops, device_id) 
+       VALUES ($version, $type, $timestamp, $payload, $allowedHops, $deviceId)`,
     );
 
     try {
       await statement.executeAsync({
         $version: packet.version,
         $type: packet.type,
-        $senderId: packet.senderId,
-        $recipientId: packet.recipientId,
         $timestamp: packet.timestamp,
         $payload: packet.payload,
-        $signature: packet.signature,
         $allowedHops: packet.allowedHops,
-        $route: packet.route,
+        $deviceId: deviceUUID,
       });
 
       return packet;
@@ -35,27 +37,25 @@ class SQRelayPacketsRepository implements RelayPacketsRepository, Repository {
     }
   }
 
-  async getAll(): Promise<BitchatPacket[]> {
+  async getAll(): Promise<RelayPacket[]> {
     const statement = await this.db.prepareAsync(
       "SELECT * FROM relay_packets ORDER BY created_at ASC",
     );
 
     try {
       const result = await statement.executeAsync<{
+        id: number;
         version: number;
         type: number;
-        sender_id: string;
-        recipient_id: string;
         timestamp: number;
         payload: Uint8Array;
-        signature: string | null;
         allowed_hops: number;
-        route: Uint8Array;
+        device_id: string;
       }>();
 
       const rows = await result.getAllAsync();
 
-      return rows.map((row) => this.mapRowToPacket(row));
+      return rows.map((row) => this.mapRowToRelayPacket(row));
     } finally {
       await statement.finalizeAsync();
     }
@@ -73,22 +73,30 @@ class SQRelayPacketsRepository implements RelayPacketsRepository, Repository {
     }
   }
 
-  async getEarliest(): Promise<BitchatPacket | null> {
+  async deleteAll(): Promise<void> {
+    const statement = await this.db.prepareAsync("DELETE FROM relay_packets");
+
+    try {
+      await statement.executeAsync();
+    } finally {
+      await statement.finalizeAsync();
+    }
+  }
+
+  async getEarliest(): Promise<RelayPacket | null> {
     const statement = await this.db.prepareAsync(
       "SELECT * FROM relay_packets ORDER BY created_at ASC LIMIT 1",
     );
 
     try {
       const result = await statement.executeAsync<{
+        id: number;
         version: number;
         type: number;
-        sender_id: string;
-        recipient_id: string;
         timestamp: number;
         payload: Uint8Array;
-        signature: string | null;
         allowed_hops: number;
-        route: Uint8Array;
+        device_id: string;
       }>();
 
       const row = await result.getFirstAsync();
@@ -97,33 +105,117 @@ class SQRelayPacketsRepository implements RelayPacketsRepository, Repository {
         return null;
       }
 
-      return this.mapRowToPacket(row);
+      return this.mapRowToRelayPacket(row);
     } finally {
       await statement.finalizeAsync();
     }
   }
 
-  private mapRowToPacket(row: {
+  async updateAllowedHops(id: number, hops: number): Promise<void> {
+    const statement = await this.db.prepareAsync(
+      "UPDATE relay_packets SET allowed_hops = $hops WHERE id = $id",
+    );
+
+    try {
+      await statement.executeAsync({ $hops: hops, $id: id });
+    } finally {
+      await statement.finalizeAsync();
+    }
+  }
+
+  async count(): Promise<number> {
+    const statement = await this.db.prepareAsync(
+      "SELECT COUNT(*) as count FROM relay_packets",
+    );
+
+    try {
+      const result = await statement.executeAsync<{ count: number }>();
+      const row = await result.getFirstAsync();
+      return row?.count ?? 0;
+    } finally {
+      await statement.finalizeAsync();
+    }
+  }
+
+  async deleteOldest(n: number): Promise<number> {
+    if (n <= 0) return 0;
+
+    const statement = await this.db.prepareAsync(
+      `DELETE FROM relay_packets WHERE id IN (
+        SELECT id FROM relay_packets ORDER BY created_at ASC LIMIT $n
+      )`,
+    );
+
+    try {
+      const result = await statement.executeAsync({ $n: n });
+      return result.changes;
+    } finally {
+      await statement.finalizeAsync();
+    }
+  }
+
+  async markRelayed(id: number): Promise<void> {
+    const statement = await this.db.prepareAsync(
+      "UPDATE relay_packets SET relayed = 1 WHERE id = $id",
+    );
+
+    try {
+      await statement.executeAsync({ $id: id });
+    } finally {
+      await statement.finalizeAsync();
+    }
+  }
+
+  async getEarliestUnrelayed(): Promise<RelayPacket | null> {
+    const statement = await this.db.prepareAsync(
+      "SELECT * FROM relay_packets WHERE relayed = 0 ORDER BY created_at ASC LIMIT 1",
+    );
+
+    try {
+      const result = await statement.executeAsync<{
+        id: number;
+        version: number;
+        type: number;
+        timestamp: number;
+        payload: Uint8Array;
+        allowed_hops: number;
+        device_id: string;
+        relayed: number;
+      }>();
+
+      const row = await result.getFirstAsync();
+
+      if (!row) {
+        return null;
+      }
+
+      return this.mapRowToRelayPacket(row);
+    } finally {
+      await statement.finalizeAsync();
+    }
+  }
+
+  private mapRowToRelayPacket(row: {
+    id: number;
     version: number;
     type: number;
-    sender_id: string;
-    recipient_id: string;
     timestamp: number;
     payload: Uint8Array;
-    signature: string | null;
     allowed_hops: number;
-    route: Uint8Array;
-  }): BitchatPacket {
+    device_id: string;
+    relayed?: number;
+  }): RelayPacket {
     return {
-      version: row.version,
-      type: row.type,
-      senderId: row.sender_id,
-      recipientId: row.recipient_id,
-      timestamp: row.timestamp,
-      payload: row.payload,
-      signature: row.signature,
-      allowedHops: row.allowed_hops,
-      route: row.route,
+      id: row.id,
+      packet: {
+        version: row.version,
+        type: row.type,
+        timestamp: row.timestamp,
+        payload: row.payload,
+        allowedHops: row.allowed_hops,
+      },
+      deviceUUID: row.device_id,
+      relayed: row.relayed === 1,
     };
   }
 }

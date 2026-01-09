@@ -1,28 +1,74 @@
-import { useEventListener } from "expo";
 import { Tabs } from "expo-router";
 import React from "react";
 
 import { HapticTab } from "@/components/haptic-tab";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { Colors } from "@/constants/theme";
+import {
+  ConnectedDevicesRepositoryToken,
+  useRepos,
+} from "@/contexts/repository-context";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { usePacketService } from "@/hooks/use-packet-service";
-import BleModule from "@/modules/ble/src/BleModule";
+import { useRelayWorker } from "@/hooks/use-relay-worker";
+import BleModule from "@/modules/ble";
+import ConnectedDevicesRepository from "@/repos/specs/connected-devices-repository";
+import { useEventListener } from "expo";
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
+
   const { handleIncomingPacket } = usePacketService();
+  const { getRepo } = useRepos();
+  const connectedDevicesRepo = getRepo<ConnectedDevicesRepository>(
+    ConnectedDevicesRepositoryToken,
+  );
+
+  // Start the relay worker for flooding protocol
+  useRelayWorker();
 
   useEventListener(BleModule, "onPeripheralReceivedWrite", (message) => {
-    // on packet receive, try to assemble into completed message and push to messages repo
-    console.log("onPeripheralReceivedWrite");
-    handleIncomingPacket(message.rawBytes);
+    console.log("onPeripheralReceivedWrite: ", message.deviceUUID);
+    handleIncomingPacket(message.rawBytes, message.deviceUUID);
   });
 
   useEventListener(BleModule, "onCentralReceivedNotification", (message) => {
-    // store in packets repo
-    console.log("onCentralReceivedNotification");
-    handleIncomingPacket(message.rawBytes);
+    console.log("onCentralReceivedNotification: ", message.deviceUUID);
+    handleIncomingPacket(message.rawBytes, message.deviceUUID);
+  });
+
+  useEventListener(BleModule, "onPeripheralConnection", (connection) => {
+    console.log(
+      "onPeripheralConnection: ",
+      connection.deviceUUID,
+      connection.rssi,
+    );
+    connectedDevicesRepo.upsert(
+      connection.deviceUUID,
+      connection.rssi ?? null,
+      true,
+    );
+  });
+
+  useEventListener(BleModule, "onPeripheralDisconnect", (connection) => {
+    console.log("onPeripheralDisconnect: ", connection.deviceUUID);
+    connectedDevicesRepo.updateConnectionStatus(connection.deviceUUID, false);
+  });
+
+  useEventListener(BleModule, "onReadRSSI", (connection) => {
+    console.log("onReadRSSI: ", connection.deviceUUID, connection.rssi);
+    if (connection.rssi) {
+      connectedDevicesRepo.updateRSSI(connection.deviceUUID, connection.rssi);
+    }
+  });
+
+  useEventListener(BleModule, "onCentralSubscription", (connection) => {
+    console.log("onCentralSubscription: ", connection.deviceUUID);
+    connectedDevicesRepo.upsert(
+      connection.deviceUUID,
+      connection.rssi ?? null,
+      true,
+    );
   });
 
   return (

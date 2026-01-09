@@ -25,19 +25,57 @@ public class BleModule: Module {
     // MARK: - initialization
     OnCreate {
       bleManager = BleManager(
-        writeObserver: { data in
+        writeObserver: { data, deviceUUID in
           self.sendEvent(
             "onPeripheralReceivedWrite",
             [
-              "rawBytes": data
+              "rawBytes": data,
+              "deviceUUID": deviceUUID
             ]
           )
         },
-        notifyObserver: { data in
+        notifyObserver: { data, deviceUUID in
           self.sendEvent(
             "onCentralReceivedNotification",
             [
-              "rawBytes": data
+              "rawBytes": data,
+              "deviceUUID": deviceUUID
+            ]
+          )
+        },
+        onPeripheralConnection: { deviceUUID, rssi in
+          self.sendEvent(
+            "onPeripheralConnection",
+            [
+              "deviceUUID": deviceUUID,
+              "rssi": rssi
+            ]
+          )
+        },
+        onPeripheralDisconnect: { deviceUUID, rssi in
+          self.sendEvent(
+            "onPeripheralDisconnect",
+            [
+              "deviceUUID": deviceUUID,
+              "rssi": rssi
+            ]
+          )
+        },
+        onCentralSubscription: { deviceUUID, rssi in
+          self.sendEvent(
+            "onCentralSubscription",
+            [
+              "deviceUUID": deviceUUID,
+              "rssi": rssi
+            ]
+          )
+        },
+        onReadRSSI: { deviceUUID, rssi in
+          self.sendEvent(
+            "onReadRSSI",
+            [
+              "deviceUUID": deviceUUID,
+              "rssi": rssi
             ]
           )
         }
@@ -45,29 +83,22 @@ public class BleModule: Module {
     }
     
     // Defines event names that the module can send to JavaScript.
-    Events("onPeripheralReceivedWrite", "onCentralReceivedNotification")
+    Events("onPeripheralReceivedWrite", "onCentralReceivedNotification", "onPeripheralConnection", "onPeripheralDisconnect", "onCentralSubscription", "onReadRSSI")
        
     // Defines a JavaScript function that always returns a Promise and whose native code
     // is by default dispatched on the different thread than the JavaScript runtime runs on.
-    AsyncFunction("broadcastPacketAsync") { (value: Data) in
+    AsyncFunction("broadcastPacketAsync") { (value: Data, blackoutDeviceUUIDs: [String]) in
       // write to connected peripherals
       // notify subscribed centrals
      if let bm = bleManager {
       print("Broadcasting!")
-       bm.broadcastPacket(packet: value)
+       bm.broadcastPacket(packet: value, blackoutDeviceUUIDs: blackoutDeviceUUIDs)
      } else {
        print("❌ Failed to broadcast packet")
      }
     }
   }
 }
-
-final class TestManager: NSObject {
-  init(writeObserver: @escaping (Data) -> Void, notifyObserver: @escaping (Data) -> Void) {
-    super.init()
-  }
-}
-
 
 final class BleManager: NSObject {
   #if DEBUG
@@ -131,12 +162,27 @@ final class BleManager: NSObject {
   private var characteristic: CBMutableCharacteristic?
   private let rssiThreshold: Int = -90
   
-  let peripheralWriteObserver: (Data) -> Void
-  let notifyObserver: (Data) -> Void
+  let peripheralWriteObserver: (Data, String) -> Void
+  let notifyObserver: (Data, String) -> Void
+  let onPeripheralConnection: (String, Int?) -> Void
+  let onPeripheralDisconnect: (String, Int?) -> Void
+  let onCentralSubscription: (String, Int?) -> Void
+  let onReadRSSI: (String, Int) -> Void
   
-  init(writeObserver: @escaping (Data) -> Void, notifyObserver: @escaping (Data) -> Void) {
+  init(
+    writeObserver: @escaping (Data, String) -> Void,
+    notifyObserver: @escaping (Data, String) -> Void,
+    onPeripheralConnection: @escaping (String, Int?) -> Void,
+    onPeripheralDisconnect: @escaping (String, Int?) -> Void,
+    onCentralSubscription: @escaping (String, Int?) -> Void,
+    onReadRSSI: @escaping (String, Int) -> Void
+  ) {
     self.peripheralWriteObserver = writeObserver
     self.notifyObserver = notifyObserver
+    self.onPeripheralConnection = onPeripheralConnection
+    self.onPeripheralDisconnect = onPeripheralDisconnect
+    self.onCentralSubscription = onCentralSubscription
+    self.onReadRSSI = onReadRSSI
     super.init()
     
     // Set up application state tracking (iOS only)
@@ -219,7 +265,7 @@ final class BleManager: NSObject {
   }
   #endif
   
-  func broadcastPacket(packet: Data) {
+  func broadcastPacket(packet: Data, blackoutDeviceUUIDs: [String]) {
     let peripheralStates = snapshotPeripheralStates()
     let connectedPeripheralIds: [String] = peripheralStates
       .filter { $0.isConnected }
@@ -239,6 +285,7 @@ final class BleManager: NSObject {
     // writes to selected connected peripherals
     for s in peripheralStates where s.isConnected {
       let pid = s.peripheral.identifier.uuidString
+      guard !blackoutDeviceUUIDs.contains(pid) else { continue }
       guard connectedPeripheralIds.contains(pid) else { continue }
       print("past connected peripheral id guard")
       if let ch = s.characteristic {
@@ -254,7 +301,7 @@ final class BleManager: NSObject {
     
     // notify selected subscribed centrals
     if let ch = characteristic {
-      let targets = subscribedCentrals
+      let targets = subscribedCentrals.filter { !blackoutDeviceUUIDs.contains($0.identifier.uuidString) }
       if !targets.isEmpty {
         _ = peripheralManager?.updateValue(packet, for: ch, onSubscribedCentrals: targets)
       }
@@ -419,6 +466,10 @@ extension BleManager: CBCentralManagerDelegate {
       
       print("✅ Connected: \(peripheral.name ?? "Unknown") [\(peripheralId)]")
       
+      peripheral.readRSSI()
+      
+      onPeripheralConnection(peripheralId, nil)
+      
       // discover services
       peripheral.discoverServices([BleManager.serviceUUID])
     }
@@ -460,6 +511,8 @@ extension BleManager: CBCentralManagerDelegate {
       if let peerId {
         peerToPeripheralUUID.removeValue(forKey: peerId)
       }
+      
+      onPeripheralDisconnect(peripheralId, nil)
       
       // restart scanning with allow duplicates for faster re-discovery
       if centralManager?.state == .poweredOn {
@@ -612,6 +665,7 @@ extension BleManager: CBPeripheralManagerDelegate {
       subscribedCentrals.append(central)
       
       // TODO: send announce?
+      onCentralSubscription(central.identifier.uuidString, nil)
     }
     
     public func peripheralManager(_ peripheral: CBPeripheralManager, central: CBCentral, didUnsubscribeFrom characteristic: CBCharacteristic) {
@@ -681,7 +735,7 @@ extension BleManager: CBPeripheralManagerDelegate {
       // process directly on our message queue to match transport context
       let grouped = Dictionary(grouping: requests, by: { $0.central.identifier.uuidString })
       for (centralUUID, group) in grouped {
-        // sortt by offset ascending
+        // sort by offset ascending
         let sorted = group.sorted { $0.offset < $1.offset }
         let hasMultiple = sorted.count > 1 || (sorted.first?.offset ?? 0) > 0
         
@@ -705,7 +759,7 @@ extension BleManager: CBPeripheralManagerDelegate {
         pendingWriteBuffers[centralUUID] = combined
         
         // send combined back to react native layer
-        peripheralWriteObserver(combined)
+        peripheralWriteObserver(combined, centralUUID)
         
         // clear buffer on success
         pendingWriteBuffers.removeValue(forKey: centralUUID)
@@ -769,6 +823,23 @@ extension BleManager: CBPeripheralDelegate {
         
         // Discovering BLE characteristics
         peripheral.discoverCharacteristics([BleManager.characteristicUUID], for: service)
+  }
+
+  func peripheral(_ peripheral: CBPeripheral, didReadRSSI RSSI: NSNumber, error: Error?) {
+      if let error = error {
+          print("⚠️ Error reading RSSI: \(error.localizedDescription)")
+          return
+      }
+      
+      let rssiValue = RSSI.intValue
+      print("📶 RSSI for \(peripheral.identifier.uuidString): \(rssiValue) dBm")
+      
+      // Optionally disconnect if signal becomes too weak
+      if rssiValue <= rssiThreshold {
+          centralManager?.cancelPeripheralConnection(peripheral)
+      } else {
+        self.onReadRSSI(peripheral.identifier.uuidString, rssiValue)
+      }
   }
   
   func peripheral(_ peripheral: CBPeripheral, didDiscoverCharacteristicsFor service: CBService, error: Error?) {
@@ -842,7 +913,7 @@ extension BleManager: CBPeripheralDelegate {
       
       peripherals[peripheralUUID] = state
       
-      self.notifyObserver(data)
+    self.notifyObserver(data, peripheral.identifier.uuidString)
   }
   
 }
