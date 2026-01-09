@@ -99,12 +99,13 @@ export function usePacketService() {
     // this prevents an observer from determining that a packet arrived at its intended recipient
     if (decodedPacket.allowedHops > 0) {
       // FIFO eviction: check capacity and evict oldest packets before adding new one
+      // Prioritizes retaining Amigo/CGKA packets over regular messages
       relayPacketsRepository.count().then(async (currentCount) => {
         if (currentCount >= MAX_RELAY_PACKETS) {
           const toEvict = currentCount - MAX_RELAY_PACKETS + 1; // +1 to make room for new packet
           const evicted = await relayPacketsRepository.deleteOldest(toEvict);
           console.log(
-            `[PacketService] FIFO eviction: removed ${evicted} oldest packets (was ${currentCount}, max ${MAX_RELAY_PACKETS})`,
+            `[PacketService] FIFO eviction: removed ${evicted} oldest non-CGKA packets first (was ${currentCount}, max ${MAX_RELAY_PACKETS})`,
           );
         }
         relayPacketsRepository.create(decodedPacket, deviceUUID);

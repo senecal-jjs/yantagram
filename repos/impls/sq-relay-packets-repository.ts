@@ -140,9 +140,15 @@ class SQRelayPacketsRepository implements RelayPacketsRepository, Repository {
   async deleteOldest(n: number): Promise<number> {
     if (n <= 0) return 0;
 
+    // Prioritize retaining Amigo/CGKA packets (types 0 = AMIGO_WELCOME, 1 = AMIGO_PATH_UPDATE)
+    // First delete non-Amigo packets, then Amigo packets only if needed
     const statement = await this.db.prepareAsync(
       `DELETE FROM relay_packets WHERE id IN (
-        SELECT id FROM relay_packets ORDER BY created_at ASC LIMIT $n
+        SELECT id FROM relay_packets 
+        ORDER BY 
+          CASE WHEN type IN (0, 1) THEN 1 ELSE 0 END ASC,
+          created_at ASC 
+        LIMIT $n
       )`,
     );
 
