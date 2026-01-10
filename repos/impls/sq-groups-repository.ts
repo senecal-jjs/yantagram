@@ -28,8 +28,7 @@ class SQGroupsRepository implements GroupsRepository, Repository {
        FROM groups 
        INNER JOIN group_members ON groups.id = group_members.group_id 
        WHERE group_members.contact_id = $contactId 
-       GROUP BY groups.id 
-       HAVING COUNT(group_members.contact_id) = 1 
+         AND groups.expandable = 0
        LIMIT 1`,
     );
 
@@ -86,6 +85,7 @@ class SQGroupsRepository implements GroupsRepository, Repository {
         id: string;
         name: string;
         admin: number;
+        expandable: number;
         last_active_at: number;
         created_at: number;
         updated_at: number;
@@ -113,6 +113,7 @@ class SQGroupsRepository implements GroupsRepository, Repository {
         id: string;
         name: string;
         admin: number;
+        expandable: number;
         last_active_at: number;
         created_at: number;
         updated_at: number;
@@ -140,6 +141,7 @@ class SQGroupsRepository implements GroupsRepository, Repository {
         id: string;
         name: string;
         admin: number;
+        expandable: number;
         last_active_at: number;
         created_at: number;
         updated_at: number;
