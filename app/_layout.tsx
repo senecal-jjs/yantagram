@@ -16,6 +16,7 @@ import { migrateDb } from "@/repos/db";
 import { Buffer } from "buffer";
 import * as SQLite from "expo-sqlite";
 import { SQLiteProvider } from "expo-sqlite";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import "react-native-get-random-values";
 
 global.Buffer = Buffer;
@@ -29,36 +30,38 @@ export default function RootLayout() {
   const colorScheme = useColorScheme();
 
   return (
-    <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
-      <SettingsProvider>
-        <SQLiteProvider databaseName="bitchat.db" onInit={migrateDb}>
-          <RepositoryProvider>
-            <CredentialProvider>
-              <GroupCreationProvider>
-                <Stack>
-                  <Stack.Screen
-                    name="(tabs)"
-                    options={{ headerShown: false }}
-                  />
-                  <Stack.Screen
-                    name="(group-modal)"
-                    options={{ presentation: "modal", headerShown: false }}
-                  />
-                  <Stack.Screen
-                    name="(group-manager-modal)"
-                    options={{ presentation: "modal", headerShown: false }}
-                  ></Stack.Screen>
-                  <Stack.Screen
-                    name="(settings-modal)"
-                    options={{ presentation: "modal", headerShown: false }}
-                  ></Stack.Screen>
-                </Stack>
-                <StatusBar style="auto" />
-              </GroupCreationProvider>
-            </CredentialProvider>
-          </RepositoryProvider>
-        </SQLiteProvider>
-      </SettingsProvider>
-    </ThemeProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
+        <SettingsProvider>
+          <SQLiteProvider databaseName="bitchat.db" onInit={migrateDb}>
+            <RepositoryProvider>
+              <CredentialProvider>
+                <GroupCreationProvider>
+                  <Stack>
+                    <Stack.Screen
+                      name="(tabs)"
+                      options={{ headerShown: false }}
+                    />
+                    <Stack.Screen
+                      name="(group-modal)"
+                      options={{ presentation: "modal", headerShown: false }}
+                    />
+                    <Stack.Screen
+                      name="(group-manager-modal)"
+                      options={{ presentation: "modal", headerShown: false }}
+                    ></Stack.Screen>
+                    <Stack.Screen
+                      name="(settings-modal)"
+                      options={{ presentation: "modal", headerShown: false }}
+                    ></Stack.Screen>
+                  </Stack>
+                  <StatusBar style="auto" />
+                </GroupCreationProvider>
+              </CredentialProvider>
+            </RepositoryProvider>
+          </SQLiteProvider>
+        </SettingsProvider>
+      </ThemeProvider>
+    </GestureHandlerRootView>
   );
 }
