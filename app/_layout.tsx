@@ -13,6 +13,7 @@ import { RepositoryProvider } from "@/contexts/repository-context";
 import { SettingsProvider } from "@/contexts/settings-context";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useMessageRetention } from "@/hooks/use-message-retention";
+import { useRelayWorker } from "@/hooks/use-relay-worker";
 import { migrateDb } from "@/repos/db";
 import { Buffer } from "buffer";
 import * as SQLite from "expo-sqlite";
@@ -31,6 +32,7 @@ export const unstable_settings = {
  */
 function BackgroundTasks({ children }: { children: React.ReactNode }) {
   useMessageRetention();
+  useRelayWorker();
   return <>{children}</>;
 }
 

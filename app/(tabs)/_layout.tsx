@@ -10,7 +10,6 @@ import {
 } from "@/contexts/repository-context";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { usePacketService } from "@/hooks/use-packet-service";
-import { useRelayWorker } from "@/hooks/use-relay-worker";
 import BleModule from "@/modules/ble";
 import ConnectedDevicesRepository from "@/repos/specs/connected-devices-repository";
 import { useEventListener } from "expo";
@@ -23,9 +22,6 @@ export default function TabLayout() {
   const connectedDevicesRepo = getRepo<ConnectedDevicesRepository>(
     ConnectedDevicesRepositoryToken,
   );
-
-  // Start the relay worker for flooding protocol
-  useRelayWorker();
 
   useEventListener(BleModule, "onPeripheralReceivedWrite", (message) => {
     console.log("onPeripheralReceivedWrite: ", message.deviceUUID);
