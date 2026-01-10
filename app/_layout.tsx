@@ -12,6 +12,7 @@ import { GroupCreationProvider } from "@/contexts/group-creation-context";
 import { RepositoryProvider } from "@/contexts/repository-context";
 import { SettingsProvider } from "@/contexts/settings-context";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useMessageRetention } from "@/hooks/use-message-retention";
 import { migrateDb } from "@/repos/db";
 import { Buffer } from "buffer";
 import * as SQLite from "expo-sqlite";
@@ -25,6 +26,14 @@ export const unstable_settings = {
   anchor: "(tabs)",
 };
 
+/**
+ * Component that runs background tasks requiring context access
+ */
+function BackgroundTasks({ children }: { children: React.ReactNode }) {
+  useMessageRetention();
+  return <>{children}</>;
+}
+
 export default function RootLayout() {
   SQLite.deleteDatabaseAsync("bitchat.db");
   const colorScheme = useColorScheme();
@@ -35,29 +44,31 @@ export default function RootLayout() {
         <SettingsProvider>
           <SQLiteProvider databaseName="bitchat.db" onInit={migrateDb}>
             <RepositoryProvider>
-              <CredentialProvider>
-                <GroupCreationProvider>
-                  <Stack>
-                    <Stack.Screen
-                      name="(tabs)"
-                      options={{ headerShown: false }}
-                    />
-                    <Stack.Screen
-                      name="(group-modal)"
-                      options={{ presentation: "modal", headerShown: false }}
-                    />
-                    <Stack.Screen
-                      name="(group-manager-modal)"
-                      options={{ presentation: "modal", headerShown: false }}
-                    ></Stack.Screen>
-                    <Stack.Screen
-                      name="(settings-modal)"
-                      options={{ presentation: "modal", headerShown: false }}
-                    ></Stack.Screen>
-                  </Stack>
-                  <StatusBar style="auto" />
-                </GroupCreationProvider>
-              </CredentialProvider>
+              <BackgroundTasks>
+                <CredentialProvider>
+                  <GroupCreationProvider>
+                    <Stack>
+                      <Stack.Screen
+                        name="(tabs)"
+                        options={{ headerShown: false }}
+                      />
+                      <Stack.Screen
+                        name="(group-modal)"
+                        options={{ presentation: "modal", headerShown: false }}
+                      />
+                      <Stack.Screen
+                        name="(group-manager-modal)"
+                        options={{ presentation: "modal", headerShown: false }}
+                      ></Stack.Screen>
+                      <Stack.Screen
+                        name="(settings-modal)"
+                        options={{ presentation: "modal", headerShown: false }}
+                      ></Stack.Screen>
+                    </Stack>
+                    <StatusBar style="auto" />
+                  </GroupCreationProvider>
+                </CredentialProvider>
+              </BackgroundTasks>
             </RepositoryProvider>
           </SQLiteProvider>
         </SettingsProvider>
