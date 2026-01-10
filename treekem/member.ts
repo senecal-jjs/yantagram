@@ -185,6 +185,13 @@ export class Member {
   }
 
   /**
+   * Remove a group from member's state
+   */
+  removeGroup(groupName: string): boolean {
+    return this.groups.delete(groupName);
+  }
+
+  /**
    * Add self to a group (claims leftmost open leaf)
    */
   async addToGroup(groupName: string): Promise<UpdateMessage> {

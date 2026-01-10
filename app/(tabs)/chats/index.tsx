@@ -42,7 +42,7 @@ export type Conversation = {
 
 export default function TabTwoScreen() {
   const router = useRouter();
-  const { deleteMember } = useCredentials();
+  const { deleteMember, member, saveMember } = useCredentials();
   const { resetSettings } = useSettings();
   const [showQRModal, setShowQRModal] = useState(false);
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -221,6 +221,22 @@ export default function TabTwoScreen() {
     conversation.name.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
+  const handleDeleteChat = async (chatId: string) => {
+    try {
+      // Remove group from cryptographic member state
+      if (member) {
+        member.removeGroup(chatId);
+        await saveMember();
+      }
+      // Delete the group from database (cascade will remove group_members)
+      await groupsRepo.delete(chatId);
+      // Refresh the conversations list
+      fetchConversations();
+    } catch (error) {
+      console.error("Failed to delete chat:", error);
+    }
+  };
+
   const renderItem = ({ item }: { item: Conversation }) => (
     <ConversationItem
       conversation={item}
@@ -230,6 +246,7 @@ export default function TabTwoScreen() {
           params: { chatId: item.id },
         })
       }
+      onDelete={handleDeleteChat}
     />
   );
 
@@ -328,7 +345,7 @@ export default function TabTwoScreen() {
             showsVerticalScrollIndicator={false}
             keyExtractor={(item) => item.id}
             renderItem={renderItem}
-            style={{ marginTop: 70 }}
+            style={{ marginTop: 75 }}
             contentContainerStyle={{ paddingBottom: 100 }}
           />
         )}
