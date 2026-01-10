@@ -93,7 +93,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     padding: 15,
-    // backgroundColor: "#000",
   },
   itemPressed: {
     backgroundColor: "rgba(255, 255, 255, 0.1)",
