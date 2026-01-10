@@ -218,6 +218,11 @@ export default function Chat() {
   };
 
   const onAvatarPress = () => {
+    // Don't navigate to group details for non-expandable groups (1:1 private chats)
+    if (!group?.expandable) {
+      return;
+    }
+
     router.navigate({
       pathname: "/(group-manager-modal)/group-details",
       params: { groupId: chatId },
@@ -234,17 +239,19 @@ export default function Chat() {
             }}
           />
           <View style={styles.headerCenter}>
-            <Pressable onPress={onAvatarPress}>
+            <Pressable onPress={onAvatarPress} disabled={!group?.expandable}>
               <View style={styles.avatarBubble}>
                 <Text style={styles.avatarText}>{groupName.at(0)}</Text>
               </View>
               <View style={styles.pressableName}>
                 <Text style={styles.headerText}>{groupName}</Text>
-                <IconSymbol
-                  size={12}
-                  name="chevron.right"
-                  color={"white"}
-                ></IconSymbol>
+                {group?.expandable && (
+                  <IconSymbol
+                    size={12}
+                    name="chevron.right"
+                    color={"white"}
+                  ></IconSymbol>
+                )}
               </View>
             </Pressable>
           </View>

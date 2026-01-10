@@ -24,6 +24,7 @@ export interface SerializedTree {
   capacity: number;
   threshold: number;
   admins: number[];
+  expandable: boolean;
   actionMemberCred: Credentials;
 }
 
@@ -65,6 +66,7 @@ export interface Ciphertext {
 export interface SerializedGroup {
   threshold: number;
   admins: number[];
+  expandable: boolean;
   ratchetTree: SerializedTree;
 }
 

@@ -19,9 +19,6 @@ enum PacketType {
   LEAVE, // "I'm leaving"
   SYNC, // a sync message between peers, should not be relayed
 
-  NOISE_HANDSHAKE, // Handshake (init or response determined by payload)
-  NOISE_ENCRYPTED, // All encrypted payloads ( messages, receipts, etc.)
-
   FRAGMENT, // Single fragment type for large messages
   FILE_TRANSFER, // Binary file/audio/image payloads
 

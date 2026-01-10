@@ -5,10 +5,6 @@ import CryptoKit
 
 import ExpoModulesCore
 
-struct PeerID: Hashable {
-  let bare: String
-}
-
 public class BleModule: Module {
   private let notificationCenter: NotificationCenter = .default
   private var bleManager: BleManager? = nil
@@ -110,7 +106,6 @@ final class BleManager: NSObject {
   private static let centralRestorationID = "chat.bitchat.ble.central"
   private static let peripheralRestorationID = "chat.bitchat.ble.peripheral"
   
-  private let collectionsQueue = DispatchQueue(label: "mesh.collections", attributes: .concurrent)
   private let bleQueue = DispatchQueue(label: "mesh.bluetooth", qos: .userInitiated)
   private let bleQueueKey = DispatchSpecificKey<Void>()
 
@@ -119,48 +114,58 @@ final class BleManager: NSObject {
   private var isAppActive: Bool = true  // Assume active initially
   #endif
   
-  // MARK - Core State (3 Essential Collections)
+  // MARK - Core State
   
   // 1. Consolidated Peripheral Tracking
   private struct PeripheralState {
       let peripheral: CBPeripheral
       var characteristic: CBCharacteristic?
-      var peerID: PeerID?
       var isConnecting: Bool = false
       var isConnected: Bool = false
       var lastConnectionAttempt: Date? = nil
   }
   
   private var peripherals: [String: PeripheralState] = [:]  // UUID -> PeripheralState
-  private var peerToPeripheralUUID: [PeerID: String] = [:]  // PeerID -> Peripheral UUID
   private var recentConnectTimeouts: [String: Date] = [:] // Peripheral UUID -> last timeout
   
   // 2. BLE Centrals (when acting as peripheral)
   private var subscribedCentrals: [CBCentral] = []
-  private var centralToPeerID: [String: PeerID] = [:]  // Central UUID -> Peer ID mapping
   // Accumulate long write chunks per central until a full frame decodes
   private var pendingWriteBuffers: [String: Data] = [:]
-  
-  // 3. Peer Information (single source of truth)
-  private struct PeerInfo {
-      let peerID: PeerID
-      var nickname: String
-      var isConnected: Bool
-      var noisePublicKey: Data?
-      var signingPublicKey: Data?
-      var isVerifiedNickname: Bool
-      var lastSeen: Date
-  }
-  private var peers: [PeerID: PeerInfo] = [:]
-  private var currentPeerIDs: [PeerID] {
-      Array(peers.keys)
-  }
 
   // MARK: - Core BLE Objects
   private var centralManager: CBCentralManager?
   private var peripheralManager: CBPeripheralManager?
   private var characteristic: CBMutableCharacteristic?
-  private let rssiThreshold: Int = -90
+  
+  // MARK: - Maintenance & Duty Cycle
+  private var maintenanceTimer: DispatchSourceTimer?
+  private var scanDutyTimer: DispatchSourceTimer?
+  private var maintenanceCounter: Int = 0
+  
+  // RSSI threshold adaptation
+  private var dynamicRSSIThreshold: Int = -80
+  private var lastIsolatedAt: Date? = nil
+  private static let rssiIsolatedBase: Int = -85
+  private static let rssiIsolatedRelaxed: Int = -95
+  private static let rssiConnectedThreshold: Int = -75
+  private static let rssiHighTimeoutThreshold: Int = -70
+  private static let isolationRelaxThresholdSeconds: TimeInterval = 30.0
+  private static let recentTimeoutWindowSeconds: TimeInterval = 60.0
+  private static let recentTimeoutCountThreshold: Int = 3
+  
+  // Duty cycle parameters
+  private var dutyEnabled: Bool = true
+  private var dutyActive: Bool = true
+  private var dutyOnDuration: TimeInterval = 4.0
+  private var dutyOffDuration: TimeInterval = 6.0
+  private static let dutyOnDurationDense: TimeInterval = 2.0
+  private static let dutyOffDurationDense: TimeInterval = 8.0
+  private static let highDegreeThreshold: Int = 5
+  private static let recentTrafficForceScanSeconds: TimeInterval = 10.0
+  private static let maintenanceInterval: TimeInterval = 10.0
+  // Legacy static threshold (used in didDiscover)
+  private var rssiThreshold: Int { dynamicRSSIThreshold }
   
   let peripheralWriteObserver: (Data, String) -> Void
   let notifyObserver: (Data, String) -> Void
@@ -229,9 +234,22 @@ final class BleManager: NSObject {
      centralManager = CBCentralManager(delegate: self, queue: bleQueue)
      peripheralManager = CBPeripheralManager(delegate: self, queue: bleQueue)
      #endif
+    
+    // Start maintenance timer for periodic housekeeping
+    let timer = DispatchSource.makeTimerSource(queue: bleQueue)
+    timer.schedule(deadline: .now() + BleManager.maintenanceInterval,
+                   repeating: BleManager.maintenanceInterval,
+                   leeway: .seconds(1))
+    timer.setEventHandler { [weak self] in
+      self?.performMaintenance()
+    }
+    timer.resume()
+    maintenanceTimer = timer
   }
   
   deinit {
+    maintenanceTimer?.cancel()
+    scanDutyTimer?.cancel()
     centralManager?.stopScan()
     peripheralManager?.stopAdvertising()
     #if os(iOS)
@@ -273,7 +291,7 @@ final class BleManager: NSObject {
     
     let subscribedCentrals: [CBCentral]
     if let _ = characteristic {
-      let (centrals, _) = snapshotSubscribedCentrals()
+      let centrals = snapshotSubscribedCentrals()
       subscribedCentrals = centrals
     } else {
       subscribedCentrals = []
@@ -317,11 +335,11 @@ final class BleManager: NSObject {
           return bleQueue.sync { Array(peripherals.values) }
       }
   }
-  private func snapshotSubscribedCentrals() -> ([CBCentral], [String: PeerID]) {
+  private func snapshotSubscribedCentrals() -> [CBCentral] {
       if DispatchQueue.getSpecific(key: bleQueueKey) != nil {
-          return (self.subscribedCentrals, self.centralToPeerID)
+          return self.subscribedCentrals
       } else {
-          return bleQueue.sync { (self.subscribedCentrals, self.centralToPeerID) }
+          return bleQueue.sync { self.subscribedCentrals }
       }
   }
 }
@@ -407,10 +425,9 @@ extension BleManager: CBCentralManagerDelegate {
       peripherals[peripheralId] = PeripheralState(
         peripheral: peripheral,
         characteristic: nil,
-        peerID: nil,
         isConnecting: true,
         isConnected: false,
-        lastConnectionAttempt: Date(),
+        lastConnectionAttempt: Date()
       )
       
       peripheral.delegate = self
@@ -454,10 +471,9 @@ extension BleManager: CBCentralManagerDelegate {
         peripherals[peripheralId] = PeripheralState(
           peripheral: peripheral,
           characteristic: nil,
-          peerID: nil,
           isConnecting: false,
           isConnected: true,
-          lastConnectionAttempt: nil,
+          lastConnectionAttempt: nil
         )
       }
       
@@ -496,9 +512,6 @@ extension BleManager: CBCentralManagerDelegate {
       
       let peripheralId = peripheral.identifier.uuidString
       
-      // find the peer id if we have it
-      let peerId = peripherals[peripheralId]?.peerID
-      
       // if disconnect carried an error (often timeout), apply short backoff to avoid thrash
       if error != nil {
         recentConnectTimeouts[peripheralId] = Date()
@@ -506,11 +519,6 @@ extension BleManager: CBCentralManagerDelegate {
       
       // clean up references
       peripherals.removeValue(forKey: peripheralId)
-      
-      // Clean up peer mappings
-      if let peerId {
-        peerToPeripheralUUID.removeValue(forKey: peerId)
-      }
       
       onPeripheralDisconnect(peripheralId, nil)
       
@@ -537,17 +545,15 @@ extension BleManager: CBCentralManagerDelegate {
         peripheral.delegate = self
         let existing = peripherals[identifier]
         let characteristic = existing?.characteristic
-        let peerID = existing?.peerID
         let wasConnecting = existing?.isConnecting ?? false
         let wasConnected = existing?.isConnected ?? false
           
         let restoredState = PeripheralState(
           peripheral: peripheral,
           characteristic: characteristic,
-          peerID: peerID,
           isConnecting: wasConnecting || peripheral.state == .connecting,
           isConnected: wasConnected || peripheral.state == .connected,
-          lastConnectionAttempt: existing?.lastConnectionAttempt,
+          lastConnectionAttempt: existing?.lastConnectionAttempt
         )
         
         peripherals[identifier] = restoredState
@@ -677,22 +683,6 @@ extension BleManager: CBPeripheralManagerDelegate {
       // Ensure we're still advertising for other devices to find us
       if peripheral.isAdvertising == false {
         peripheral.startAdvertising(buildAdvertisementData())
-      }
-      
-      // find and disconnect the peer associated with this central
-      let centralUUID = central.identifier.uuidString
-      
-      if let peerId = centralToPeerID[centralUUID] {
-        // mark peer as not connected; retain for reachability
-        collectionsQueue.sync(flags: .barrier) {
-          if var info = peers[peerId] {
-            info.isConnected = false
-            peers[peerId] = info
-          }
-        }
-        
-        // clean up mappings
-        centralToPeerID.removeValue(forKey: centralUUID)
       }
     }
     
@@ -905,10 +895,9 @@ extension BleManager: CBPeripheralDelegate {
       var state = peripherals[peripheralUUID] ?? PeripheralState(
           peripheral: peripheral,
           characteristic: nil,
-          peerID: nil,
           isConnecting: false,
           isConnected: peripheral.state == .connected,
-          lastConnectionAttempt: nil,
+          lastConnectionAttempt: nil
       )
       
       peripherals[peripheralUUID] = state
@@ -938,5 +927,186 @@ extension BleManager {
   }
 }
 
-
-
+// MARK: - Maintenance
+extension BleManager {
+  
+  /// Consolidated maintenance called periodically (every 10s)
+  private func performMaintenance() {
+    maintenanceCounter += 1
+    
+    let connectedPeripheralCount = peripherals.values.filter { $0.isConnected }.count
+    let connectedCentralCount = subscribedCentrals.count
+    let connectedCount = connectedPeripheralCount + connectedCentralCount
+    
+    // If we have no connections, ensure we're advertising as peripheral
+    if connectedCount == 0 {
+      if let pm = peripheralManager, pm.state == .poweredOn && !pm.isAdvertising {
+        pm.startAdvertising(buildAdvertisementData())
+      }
+    }
+    
+    // Update scanning duty-cycle based on connectivity
+    updateScanningDutyCycle(connectedCount: connectedCount)
+    
+    // Update RSSI threshold based on connectivity
+    updateRSSIThreshold(connectedCount: connectedCount)
+    
+    // Check connection health every cycle
+    checkConnectionHealth()
+    
+    // Every 30 seconds (3 cycles): cleanup old timeout entries
+    if maintenanceCounter % 3 == 0 {
+      performCleanup()
+    }
+    
+    // Reset counter to prevent overflow (every 60 seconds)
+    if maintenanceCounter >= 6 {
+      maintenanceCounter = 0
+    }
+    
+    print("🔧 Maintenance: connected=\(connectedCount), rssi=\(dynamicRSSIThreshold), scanning=\(centralManager?.isScanning ?? false)")
+  }
+  
+  /// Check for stale connections and clean up
+  private func checkConnectionHealth() {
+    let now = Date()
+    var disconnectedPeripheralIDs: [String] = []
+    
+    // Check peripherals for stale connections
+    for (peripheralId, state) in peripherals {
+      if state.isConnected {
+        // Check if the underlying peripheral is still connected
+        if state.peripheral.state != .connected {
+          print("🔌 Peripheral \(peripheralId) no longer connected")
+          disconnectedPeripheralIDs.append(peripheralId)
+        }
+      }
+    }
+    
+    // Clean up disconnected peripherals and notify JS
+    for peripheralId in disconnectedPeripheralIDs {
+      if var state = peripherals[peripheralId] {
+        state.isConnected = false
+        state.isConnecting = false
+        peripherals[peripheralId] = state
+      }
+      // Notify JavaScript about the disconnection
+      onPeripheralDisconnect(peripheralId, nil)
+    }
+  }
+  
+  /// Update scanning duty cycle based on connection state
+  private func updateScanningDutyCycle(connectedCount: Int) {
+    guard let central = centralManager, central.state == .poweredOn else { return }
+    
+    // Determine if we should use duty cycling
+    #if os(iOS)
+    let active = isAppActive
+    #else
+    let active = true
+    #endif
+    
+    // Force full-time scanning if we have very few neighbors
+    let forceScanOn = connectedCount <= 2
+    let shouldDuty = dutyEnabled && active && connectedCount > 0 && !forceScanOn
+    
+    if shouldDuty {
+      if scanDutyTimer == nil {
+        // Start timer to toggle scanning on/off
+        let t = DispatchSource.makeTimerSource(queue: bleQueue)
+        
+        // Start with scanning ON
+        if !central.isScanning { startScanning() }
+        dutyActive = true
+        
+        // Adjust duty cycle under dense networks to save battery
+        if connectedCount >= BleManager.highDegreeThreshold {
+          dutyOnDuration = BleManager.dutyOnDurationDense
+          dutyOffDuration = BleManager.dutyOffDurationDense
+        } else {
+          dutyOnDuration = 4.0
+          dutyOffDuration = 6.0
+        }
+        
+        t.schedule(deadline: .now() + dutyOnDuration, repeating: dutyOnDuration + dutyOffDuration)
+        t.setEventHandler { [weak self] in
+          guard let self = self, let c = self.centralManager else { return }
+          if self.dutyActive {
+            // Turn OFF scanning for offDuration
+            if c.isScanning { c.stopScan() }
+            self.dutyActive = false
+            // Schedule turning back ON after offDuration
+            self.bleQueue.asyncAfter(deadline: .now() + self.dutyOffDuration) {
+              if self.centralManager?.state == .poweredOn { self.startScanning() }
+              self.dutyActive = true
+            }
+          }
+        }
+        t.resume()
+        scanDutyTimer = t
+      }
+    } else {
+      // Cancel duty cycle and ensure scanning is ON for discovery
+      scanDutyTimer?.cancel()
+      scanDutyTimer = nil
+      if !central.isScanning { startScanning() }
+    }
+  }
+  
+  /// Adjust RSSI threshold based on connectivity and failure patterns
+  private func updateRSSIThreshold(connectedCount: Int) {
+    if connectedCount == 0 {
+      // Isolated: relax threshold slowly to hunt for distant nodes
+      if lastIsolatedAt == nil { lastIsolatedAt = Date() }
+      let elapsed = Date().timeIntervalSince(lastIsolatedAt ?? Date())
+      if elapsed > BleManager.isolationRelaxThresholdSeconds {
+        dynamicRSSIThreshold = BleManager.rssiIsolatedRelaxed
+      } else {
+        dynamicRSSIThreshold = BleManager.rssiIsolatedBase
+      }
+      return
+    }
+    
+    lastIsolatedAt = nil
+    
+    // Base threshold when connected
+    var threshold = -80
+    
+    // If we have many links or many connection candidates, prefer closer peers
+    let linkCount = peripherals.values.filter { $0.isConnected || $0.isConnecting }.count
+    if linkCount >= 8 { // At connection budget
+      threshold = BleManager.rssiConnectedThreshold
+    }
+    
+    // If we have many recent timeouts, raise threshold further
+    let recentTimeouts = recentConnectTimeouts.filter {
+      Date().timeIntervalSince($0.value) < BleManager.recentTimeoutWindowSeconds
+    }.count
+    
+    if recentTimeouts >= BleManager.recentTimeoutCountThreshold {
+      threshold = max(threshold, BleManager.rssiHighTimeoutThreshold)
+    }
+    
+    dynamicRSSIThreshold = threshold
+  }
+  
+  /// Cleanup old entries
+  private func performCleanup() {
+    let now = Date()
+    
+    // Clean old connection timeout backoff entries
+    let timeoutCutoff = now.addingTimeInterval(-15.0) // 15 seconds
+    recentConnectTimeouts = recentConnectTimeouts.filter { $0.value >= timeoutCutoff }
+    
+    // Clean stale peripheral entries that are neither connected nor connecting
+    let staleCutoff = now.addingTimeInterval(-60.0) // 1 minute
+    for (peripheralId, state) in peripherals {
+      if !state.isConnected && !state.isConnecting {
+        if let lastAttempt = state.lastConnectionAttempt, lastAttempt < staleCutoff {
+          peripherals.removeValue(forKey: peripheralId)
+          print("🗑️ Cleaned up stale peripheral entry: \(peripheralId)")
+        }
+      }
+    }
+  }
+}

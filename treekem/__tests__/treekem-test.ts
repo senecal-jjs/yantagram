@@ -154,6 +154,7 @@ describe("TreeKEM Member Tests", () => {
     const welcomeMessage = await members[10].sendWelcomeMessage(
       alice.credential,
       groupName,
+      "test",
     );
     const pathUpdateMessage = await alice.joinGroup(welcomeMessage);
     await members[10].applyUpdatePath(
@@ -211,6 +212,7 @@ describe("TreeKEM Member Tests", () => {
     const welcomeMessage = await member.sendWelcomeMessage(
       member2.credential,
       groupName,
+      "test",
     );
     const pathUpdateMessage = await member2.joinGroup(welcomeMessage);
     await member.applyUpdatePath(
@@ -255,6 +257,7 @@ describe("TreeKEM Member Tests", () => {
     const welcomeMessage = await member.sendWelcomeMessage(
       member2.credential,
       groupName,
+      "test",
     );
     const pathUpdateMessage = await member2.joinGroup(welcomeMessage);
     await member.applyUpdatePath(
@@ -267,6 +270,7 @@ describe("TreeKEM Member Tests", () => {
     const welcomeMessage3 = await member.sendWelcomeMessage(
       member3.credential,
       groupName,
+      "test",
     );
     const pathUpdateMessage3 = await member3.joinGroup(welcomeMessage3);
     await member.applyUpdatePath(
@@ -383,6 +387,7 @@ describe("TreeKEM Member Tests", () => {
     const welcomeMessage = await member.sendWelcomeMessage(
       member2.credential,
       groupName,
+      "test",
     );
     const pathUpdateMessage = await member2.joinGroup(welcomeMessage);
     await member.applyUpdatePath(
@@ -443,6 +448,7 @@ describe("TreeKEM Member Tests", () => {
     const welcomeMessage3 = await member2.sendWelcomeMessage(
       member3.credential,
       groupName,
+      "test",
     );
     const pathUpdateMessage3 = await member3.joinGroup(welcomeMessage3);
     await member.applyUpdatePath(
@@ -594,6 +600,7 @@ describe("TreeKEM Member Tests", () => {
     const welcomeMessage = await member.sendWelcomeMessage(
       member2.credential,
       groupName,
+      "test",
     );
 
     console.log("welcome message");
@@ -673,6 +680,7 @@ describe("TreeKEM Member Tests", () => {
     const welcomeMessage = await member.sendWelcomeMessage(
       member2.credential,
       groupName,
+      "test",
     );
     const pathUpdateMessage = await member2.joinGroup(welcomeMessage);
     await member.applyUpdatePath(

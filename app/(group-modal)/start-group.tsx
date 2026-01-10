@@ -2,9 +2,14 @@ import ContactList from "@/components/contact-list";
 import { BounceButton } from "@/components/ui/bounce-button";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useCredentials } from "@/contexts/credential-context";
-import { GroupsRepositoryToken, useRepos } from "@/contexts/repository-context";
+import {
+  GroupMembersRepositoryToken,
+  GroupsRepositoryToken,
+  useRepos,
+} from "@/contexts/repository-context";
 import { useMessageSender } from "@/hooks/use-message-sender";
 import { Contact } from "@/repos/specs/contacts-repository";
+import { GroupMembersRepository } from "@/repos/specs/group-members-repository";
 import GroupsRepository from "@/repos/specs/groups-repository";
 import { Member } from "@/treekem/member";
 import { UUID } from "@/types/utility";
@@ -22,6 +27,9 @@ export default function StartMessageScreen() {
   const { sendAmigoWelcome } = useMessageSender();
   const { getRepo } = useRepos();
   const groupsRepo = getRepo<GroupsRepository>(GroupsRepositoryToken);
+  const groupMembersRepo = getRepo<GroupMembersRepository>(
+    GroupMembersRepositoryToken,
+  );
 
   const handleClose = () => {
     router.back();
@@ -47,8 +55,8 @@ export default function StartMessageScreen() {
         // members of the group can give the group whatever name they want on their own device
         const groupId = randomUUID();
 
-        // Create the group with TreeKEM
-        member.createGroup(groupCapacity, groupId, 1);
+        // Create the group with TreeKEM (not expandable for 1:1 chats)
+        member.createGroup(groupCapacity, groupId, 1, false);
 
         // add creator to the group
         await member.addToGroup(groupId);
@@ -56,7 +64,16 @@ export default function StartMessageScreen() {
         // Save update member state with new group
         await saveMember();
 
-        const group = await groupsRepo.create(groupId, contact.pseudonym, true);
+        // Private 1:1 chats are not expandable
+        const group = await groupsRepo.create(
+          groupId,
+          contact.pseudonym,
+          true,
+          false,
+        );
+
+        // Add the contact to group_members so getSingleContactGroup can find it
+        await groupMembersRepo.add(group.id, contact.id);
 
         sendWelcomeMessage(contact, member, group.id);
 
