@@ -25,6 +25,27 @@ class SQMessagesRepository implements MessagesRepository, Repository {
     }
   }
 
+  async deleteOlderThan(timestampMs: number): Promise<number> {
+    const statement = await this.db.prepareAsync(
+      "DELETE FROM messages WHERE timestamp < $timestamp",
+    );
+
+    try {
+      const result = await statement.executeAsync({
+        $timestamp: timestampMs,
+      });
+      const deletedCount = result.changes;
+
+      if (deletedCount > 0) {
+        dbListener.notifyMessageChange();
+      }
+
+      return deletedCount;
+    } finally {
+      await statement.finalizeAsync();
+    }
+  }
+
   async create(
     id: string,
     groupId: string,

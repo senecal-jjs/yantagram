@@ -25,5 +25,6 @@ export default interface MessagesRepository {
   markGroupAsRead(groupId: UUID, notifyListener: boolean): Promise<void>;
   markAsRead(id: UUID, notifyListener: boolean): Promise<void>;
   hasUnreadInGroup(groupId: UUID): Promise<boolean>;
+  deleteOlderThan(timestampMs: number): Promise<number>;
   deleteAll(): Promise<void>;
 }
