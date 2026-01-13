@@ -1,26 +1,29 @@
 {
   "expo": {
-    "name": "bitchat-client-react-native",
-    "slug": "bitchat-client-react-native",
+    "name": "yantagram",
+    "slug": "yantagram",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "bitchatclientreactnative",
+    "scheme": "yantagram",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.bitcli.bitchat",
+      "bundleIdentifier": "com.yantagram.yantagram",
       "infoPlist": {
         "NSBluetoothAlwaysUsageDescription": "This app uses Bluetooth to create a peripheral device",
         "NSBluetoothPeripheralUsageDescription": "This app uses Bluetooth to create a peripheral device",
-        "UIBackgroundModes": ["bluetooth-central", "bluetooth-peripheral"],
-	      "NSCameraUsageDescription": "bitchat uses the camera to scan QR codes to verify peers.",
-	      "NSPhotoLibraryUsageDescription": "bitchat lets you pick images from your photo library to share with nearby peers.",
-	      "NSMicrophoneUsageDescription": "bitchat uses the microphone to record voice notes that relay across the mesh.",
-	      "NSLocationWhenInUseUsageDescription": "bitchat uses your approximate location to compute local geohash channels for optional public chats. Exact GPS is never shared.",
-	      "UILaunchStoryboardName": "LaunchScreen",
-	      "UIRequiresFullScreen": true
+        "UIBackgroundModes": [
+          "bluetooth-central",
+          "bluetooth-peripheral"
+        ],
+        "NSCameraUsageDescription": "Yantagram uses the camera to scan QR codes to verify peers.",
+        "NSPhotoLibraryUsageDescription": "Yantagram lets you pick images from your photo library to share with nearby peers.",
+        "NSMicrophoneUsageDescription": "Yantagram uses the microphone to record voice notes that relay across the mesh.",
+        "NSLocationWhenInUseUsageDescription": "Yantagram uses your approximate location to compute local geohash channels for optional public chats. Exact GPS is never shared.",
+        "UILaunchStoryboardName": "LaunchScreen",
+        "UIRequiresFullScreen": true
       }
     },
     "android": {
@@ -38,9 +41,11 @@
         "android.permission.BLUETOOTH_ADVERTISE",
         "android.permission.BLUETOOTH_CONNECT",
         "android.permission.ACCESS_FINE_LOCATION",
-        "android.permission.ACCESS_COARSE_LOCATION"
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
       ],
-      "package": "com.bitcli.bitchat"
+      "package": "com.yantagram.yantagram"
     },
     "web": {
       "output": "static",
@@ -81,9 +86,12 @@
         "outgoingMessageRetryIntervalSeconds": 30,
         "mtuLimitBytes": 512,
         "defaultFragmentSizeBytes": 469
-        // "mtuLimitBytes": 100,
-        // "defaultFragmentSizeBytes": 25
+      },
+      "router": {},
+      "eas": {
+        "projectId": "796de80a-5582-46fb-94ef-4ef656b5c02d"
       }
-    }
+    },
+    "owner": "ace149"
   }
 }
