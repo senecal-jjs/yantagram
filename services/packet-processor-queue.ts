@@ -1,6 +1,6 @@
 import { BitchatPacket } from "@/types/global";
 import { quickHash } from "@/utils/hash";
-import { EventEmitter } from "events";
+import EventEmitter from "eventemitter3";
 import { randomUUID } from "expo-crypto";
 
 type QueueItem = {
