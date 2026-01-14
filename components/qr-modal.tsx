@@ -1,4 +1,4 @@
-import { CredentialsQR } from "@/components/credentials-qr";
+import { CredentialsQR, QRCodeRef } from "@/components/credentials-qr";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useCredential } from "@/contexts/credential-context";
 import {
@@ -8,8 +8,18 @@ import {
 import ContactsRepository from "@/repos/specs/contacts-repository";
 import { deserializeCredentialsFromQR } from "@/treekem/protocol";
 import { CameraView, useCameraPermissions } from "expo-camera";
+import { File, Paths } from "expo-file-system";
+import * as Sharing from "expo-sharing";
 import React, { PropsWithChildren, useRef, useState } from "react";
-import { Alert, Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  Alert,
+  Modal,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { BounceButton } from "./ui/bounce-button";
 
@@ -26,6 +36,7 @@ export default function QRModal({ showQRModal, handleClose }: Props) {
   const { getRepo } = useRepos();
   const contactsRepo = getRepo<ContactsRepository>(ContactsRepositoryToken);
   const isProcessingRef = useRef(false);
+  const qrCodeRef = useRef<QRCodeRef | null>(null);
 
   const handleBarCodeScanned = async ({ data }: { data: string }) => {
     // Prevent multiple scans
@@ -72,6 +83,48 @@ export default function QRModal({ showQRModal, handleClose }: Props) {
       ]);
     } finally {
       isProcessingRef.current = false;
+    }
+  };
+
+  const handleShare = async () => {
+    if (!member || !qrCodeRef.current) return;
+
+    try {
+      // Get base64 data from QR code
+      qrCodeRef.current.toDataURL(async (data: string) => {
+        try {
+          // Create temp file in cache directory
+          const filename = `yantagram-${member.credential.pseudonym}-qr.png`;
+          const file = new File(Paths.cache, filename);
+
+          // Delete if exists, then create and write
+          if (file.exists) {
+            file.delete();
+          }
+          file.create();
+          file.write(data, { encoding: "base64" });
+
+          // Share the image file - use contentUri on Android, uri on iOS
+          if (await Sharing.isAvailableAsync()) {
+            const shareUri =
+              Platform.OS === "android" ? file.contentUri : file.uri;
+            await Sharing.shareAsync(shareUri, {
+              mimeType: "image/png",
+              dialogTitle: "Share QR Code",
+            });
+          } else {
+            Alert.alert(
+              "Sharing not available",
+              "Unable to share on this device.",
+            );
+          }
+        } catch (error) {
+          console.error("Failed to share image:", error);
+          Alert.alert("Error", "Failed to share QR code image.");
+        }
+      });
+    } catch (error) {
+      console.error("Failed to share:", error);
     }
   };
 
@@ -148,9 +201,13 @@ export default function QRModal({ showQRModal, handleClose }: Props) {
                 credentials={member.credential}
                 title="Scan to Add Me"
                 size={250}
+                getRef={(ref) => (qrCodeRef.current = ref)}
               />
               <View style={styles.shareButtonContainer}>
-                <Pressable style={styles.shareButton}>
+                <Pressable
+                  style={styles.shareButton}
+                  onPress={() => handleShare()}
+                >
                   <IconSymbol
                     size={28}
                     name="square.and.arrow.up"

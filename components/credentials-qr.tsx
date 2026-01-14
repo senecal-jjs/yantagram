@@ -11,6 +11,11 @@ export type CredentialsQRProps = {
   title?: string;
   lightColor?: string;
   darkColor?: string;
+  getRef?: (ref: QRCodeRef | null) => void;
+};
+
+export type QRCodeRef = {
+  toDataURL: (callback: (data: string) => void) => void;
 };
 
 /**
@@ -23,6 +28,7 @@ export function CredentialsQR({
   title,
   lightColor,
   darkColor,
+  getRef,
 }: CredentialsQRProps) {
   const backgroundColor = useThemeColor(
     { light: lightColor, dark: darkColor },
@@ -47,6 +53,7 @@ export function CredentialsQR({
           backgroundColor="white"
           color="black"
           ecl="H" // High error correction for credential security
+          getRef={getRef}
         />
       </View>
       <Text style={[styles.pseudonym, { color: textColor }]}>
