@@ -9,6 +9,7 @@ import {
   RelayPacketsRepositoryToken,
   useRepos,
 } from "@/contexts/repository-context";
+import { dbListener } from "@/repos/db-listener";
 import ContactsRepository from "@/repos/specs/contacts-repository";
 import FragmentsRepository from "@/repos/specs/fragments-repository";
 import { GroupMembersRepository } from "@/repos/specs/group-members-repository";
@@ -351,6 +352,7 @@ export function usePacketService() {
   /**
    * Handle announce packets containing updated credentials from contacts.
    * Verifies the announce signature to ensure the pseudonym wasn't tampered with.
+   * Also updates the group name for 1:1 chats with this contact.
    */
   const handleAnnounce = async (announceBytes: Uint8Array) => {
     try {
@@ -376,6 +378,19 @@ export function usePacketService() {
           await contactsRepository.update(contact.id, {
             pseudonym: credentials.pseudonym,
           });
+
+          // Also update the group name for any 1:1 chat with this contact
+          const singleContactGroupId =
+            await groupsRepository.getSingleContactGroup(contact.id);
+          if (singleContactGroupId) {
+            await groupsRepository.update(singleContactGroupId, {
+              name: credentials.pseudonym,
+            });
+          }
+
+          // Notify listeners that contact/group data has changed
+          dbListener.notifyContactUpdate();
+
           console.log(
             `Updated contact pseudonym: ${contact.pseudonym} -> ${credentials.pseudonym}`,
           );

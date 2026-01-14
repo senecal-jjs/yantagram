@@ -176,6 +176,7 @@ export default function TabTwoScreen() {
     dbListener.onGroupCreation(fetchConversations);
     dbListener.onGroupUpdate(fetchConversations);
     dbListener.onMessageChange(fetchConversations);
+    dbListener.onContactUpdate(fetchConversations);
 
     // Keyboard listeners
     const keyboardWillShow = Keyboard.addListener(
@@ -196,6 +197,7 @@ export default function TabTwoScreen() {
       dbListener.removeGroupCreationListener(fetchConversations);
       dbListener.removeGroupUpdateListener(fetchConversations);
       dbListener.removeMessageChangeListener(fetchConversations);
+      dbListener.removeContactUpdateListener(fetchConversations);
       keyboardWillShow.remove();
       keyboardWillHide.remove();
     };
