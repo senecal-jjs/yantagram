@@ -3,9 +3,13 @@
  */
 
 export interface Credentials {
+  /** Ed25519 public key used to verify message signatures and uniquely identify this user across the network */
   verificationKey: Uint8Array;
+  /** User-chosen display name visible to contacts; can be updated and broadcast via announce packets */
   pseudonym: string;
+  /** Ed25519 signing key bytes used to authenticate outgoing messages and prove ownership of credentials */
   signature: Uint8Array;
+  /** X25519 public key used for Elliptic Curve Diffie-Hellman key exchanges when establishing encrypted channels */
   ecdhPublicKey: Uint8Array;
 }
 

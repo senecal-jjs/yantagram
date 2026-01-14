@@ -9,6 +9,265 @@ import {
   UpdateMessage,
   WelcomeMessage,
 } from "./types";
+import { createAnnounceSigningMessage, SignatureMaterial } from "./upke";
+
+/**
+ * Announce payload structure with signature for authenticity verification
+ */
+export interface AnnouncePayload {
+  credentials: Credentials;
+  timestamp: number;
+  announceSignature: Uint8Array; // Signs: verificationKey + pseudonym + timestamp
+}
+
+/**
+ * Serialize an announce payload to binary format
+ * Format:
+ * - 4 bytes: verificationKey length (uint32)
+ * - N bytes: verificationKey
+ * - 4 bytes: pseudonym length (uint32)
+ * - M bytes: pseudonym (UTF-8 encoded)
+ * - 4 bytes: signature length (uint32)
+ * - K bytes: signature (credential signature)
+ * - 4 bytes: ecdhPublicKey length (uint32)
+ * - L bytes: ecdhPublicKey
+ * - 8 bytes: timestamp (uint64)
+ * - 4 bytes: announceSignature length (uint32)
+ * - P bytes: announceSignature
+ */
+export function serializeAnnouncePayload(
+  credentials: Credentials,
+  timestamp: number,
+  signingKey: Uint8Array,
+): Uint8Array {
+  const builder = new ByteArrayBuilder();
+  const encoder = new TextEncoder();
+
+  // Serialize verificationKey
+  const vkLength = new Uint8Array(4);
+  new DataView(vkLength.buffer).setUint32(
+    0,
+    credentials.verificationKey.length,
+    false,
+  );
+  builder.append(vkLength);
+  builder.append(credentials.verificationKey);
+
+  // Serialize pseudonym (UTF-8 encoded)
+  const pseudonymBytes = encoder.encode(credentials.pseudonym);
+  const pseudonymLength = new Uint8Array(4);
+  new DataView(pseudonymLength.buffer).setUint32(
+    0,
+    pseudonymBytes.length,
+    false,
+  );
+  builder.append(pseudonymLength);
+  builder.append(pseudonymBytes);
+
+  // Serialize credential signature
+  const sigLength = new Uint8Array(4);
+  new DataView(sigLength.buffer).setUint32(
+    0,
+    credentials.signature.length,
+    false,
+  );
+  builder.append(sigLength);
+  builder.append(credentials.signature);
+
+  // Serialize ecdhPublicKey
+  const ecdhLength = new Uint8Array(4);
+  new DataView(ecdhLength.buffer).setUint32(
+    0,
+    credentials.ecdhPublicKey.length,
+    false,
+  );
+  builder.append(ecdhLength);
+  builder.append(credentials.ecdhPublicKey);
+
+  // Serialize timestamp (8 bytes)
+  const timestampBytes = new Uint8Array(8);
+  new DataView(timestampBytes.buffer).setBigUint64(0, BigInt(timestamp), false);
+  builder.append(timestampBytes);
+
+  // Create and serialize announce signature
+  const signingMessage = createAnnounceSigningMessage(
+    credentials.verificationKey,
+    credentials.pseudonym,
+    timestamp,
+  );
+  const signingMaterial = new SignatureMaterial(
+    credentials.verificationKey,
+    signingKey,
+  );
+  const announceSignature = signingMaterial.sign(signingMessage);
+
+  const announceSigLength = new Uint8Array(4);
+  new DataView(announceSigLength.buffer).setUint32(
+    0,
+    announceSignature.length,
+    false,
+  );
+  builder.append(announceSigLength);
+  builder.append(announceSignature);
+
+  return builder.build();
+}
+
+/**
+ * Deserialize binary data to AnnouncePayload
+ */
+export function deserializeAnnouncePayload(data: Uint8Array): AnnouncePayload {
+  let offset = 0;
+  const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+  const decoder = new TextDecoder();
+
+  // Deserialize verificationKey
+  const vkLength = view.getUint32(offset, false);
+  offset += 4;
+  const verificationKey = data.slice(offset, offset + vkLength);
+  offset += vkLength;
+
+  // Deserialize pseudonym
+  const pseudonymLength = view.getUint32(offset, false);
+  offset += 4;
+  const pseudonymBytes = data.slice(offset, offset + pseudonymLength);
+  const pseudonym = decoder.decode(pseudonymBytes);
+  offset += pseudonymLength;
+
+  // Deserialize credential signature
+  const sigLength = view.getUint32(offset, false);
+  offset += 4;
+  const signature = data.slice(offset, offset + sigLength);
+  offset += sigLength;
+
+  // Deserialize ecdhPublicKey
+  const ecdhLength = view.getUint32(offset, false);
+  offset += 4;
+  const ecdhPublicKey = data.slice(offset, offset + ecdhLength);
+  offset += ecdhLength;
+
+  // Deserialize timestamp
+  const timestamp = Number(view.getBigUint64(offset, false));
+  offset += 8;
+
+  // Deserialize announceSignature
+  const announceSigLength = view.getUint32(offset, false);
+  offset += 4;
+  const announceSignature = data.slice(offset, offset + announceSigLength);
+
+  return {
+    credentials: {
+      verificationKey,
+      pseudonym,
+      signature,
+      ecdhPublicKey,
+    },
+    timestamp,
+    announceSignature,
+  };
+}
+
+/**
+ * Serialize credentials to binary format for announce packets
+ * @deprecated Use serializeAnnouncePayload instead for secure announce packets
+ * Format:
+ * - 4 bytes: verificationKey length (uint32)
+ * - N bytes: verificationKey
+ * - 4 bytes: pseudonym length (uint32)
+ * - M bytes: pseudonym (UTF-8 encoded)
+ * - 4 bytes: signature length (uint32)
+ * - K bytes: signature
+ * - 4 bytes: ecdhPublicKey length (uint32)
+ * - L bytes: ecdhPublicKey
+ */
+export function serializeCredentials(credentials: Credentials): Uint8Array {
+  const builder = new ByteArrayBuilder();
+  const encoder = new TextEncoder();
+
+  // Serialize verificationKey
+  const vkLength = new Uint8Array(4);
+  new DataView(vkLength.buffer).setUint32(
+    0,
+    credentials.verificationKey.length,
+    false,
+  );
+  builder.append(vkLength);
+  builder.append(credentials.verificationKey);
+
+  // Serialize pseudonym (UTF-8 encoded)
+  const pseudonymBytes = encoder.encode(credentials.pseudonym);
+  const pseudonymLength = new Uint8Array(4);
+  new DataView(pseudonymLength.buffer).setUint32(
+    0,
+    pseudonymBytes.length,
+    false,
+  );
+  builder.append(pseudonymLength);
+  builder.append(pseudonymBytes);
+
+  // Serialize signature
+  const sigLength = new Uint8Array(4);
+  new DataView(sigLength.buffer).setUint32(
+    0,
+    credentials.signature.length,
+    false,
+  );
+  builder.append(sigLength);
+  builder.append(credentials.signature);
+
+  // Serialize ecdhPublicKey
+  const ecdhLength = new Uint8Array(4);
+  new DataView(ecdhLength.buffer).setUint32(
+    0,
+    credentials.ecdhPublicKey.length,
+    false,
+  );
+  builder.append(ecdhLength);
+  builder.append(credentials.ecdhPublicKey);
+
+  return builder.build();
+}
+
+/**
+ * Deserialize binary data to Credentials
+ * @deprecated Use deserializeAnnouncePayload instead for secure announce packets
+ */
+export function deserializeCredentials(data: Uint8Array): Credentials {
+  let offset = 0;
+  const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+  const decoder = new TextDecoder();
+
+  // Deserialize verificationKey
+  const vkLength = view.getUint32(offset, false);
+  offset += 4;
+  const verificationKey = data.slice(offset, offset + vkLength);
+  offset += vkLength;
+
+  // Deserialize pseudonym
+  const pseudonymLength = view.getUint32(offset, false);
+  offset += 4;
+  const pseudonymBytes = data.slice(offset, offset + pseudonymLength);
+  const pseudonym = decoder.decode(pseudonymBytes);
+  offset += pseudonymLength;
+
+  // Deserialize signature
+  const sigLength = view.getUint32(offset, false);
+  offset += 4;
+  const signature = data.slice(offset, offset + sigLength);
+  offset += sigLength;
+
+  // Deserialize ecdhPublicKey
+  const ecdhLength = view.getUint32(offset, false);
+  offset += 4;
+  const ecdhPublicKey = data.slice(offset, offset + ecdhLength);
+
+  return {
+    verificationKey,
+    pseudonym,
+    signature,
+    ecdhPublicKey,
+  };
+}
 
 export interface EncryptedMessage {
   ciphertext: Uint8Array;

@@ -3,11 +3,13 @@
  * Uses Ristretto255 (Curve25519), Ed25519, RSA, and AES-256-GCM
  */
 
+import ByteArrayBuilder from "@/utils/byte-array-builder";
 import { gcm } from "@noble/ciphers/aes.js";
 import { ed25519, ristretto255, x25519 } from "@noble/curves/ed25519.js";
 import { hkdf } from "@noble/hashes/hkdf.js";
 import { sha256, sha512 } from "@noble/hashes/sha2.js";
 import { getRandomBytes } from "expo-crypto";
+import { AnnouncePayload } from "./protocol";
 import { RistrettoPoint } from "./RistrettoPoint";
 import { Scalar } from "./scalar";
 import { Ciphertext } from "./types";
@@ -227,6 +229,48 @@ export class SignatureMaterial {
   ): boolean {
     return ed25519.verify(signature, message, publicKey);
   }
+}
+
+/**
+ * Create the message to be signed for announce verification.
+ * Combines verificationKey + pseudonym + timestamp to prevent tampering.
+ */
+export function createAnnounceSigningMessage(
+  verificationKey: Uint8Array,
+  pseudonym: string,
+  timestamp: number,
+): Uint8Array {
+  const encoder = new TextEncoder();
+  const builder = new ByteArrayBuilder();
+
+  builder.append(verificationKey);
+  builder.append(encoder.encode(pseudonym));
+
+  // Add timestamp as 8 bytes
+  const timestampBytes = new Uint8Array(8);
+  const view = new DataView(timestampBytes.buffer);
+  view.setBigUint64(0, BigInt(timestamp), false);
+  builder.append(timestampBytes);
+
+  return builder.build();
+}
+
+/**
+ * Verify an announce payload's signature
+ * Returns true if the announce signature is valid (proving the pseudonym wasn't tampered with)
+ */
+export function verifyAnnouncePayload(payload: AnnouncePayload): boolean {
+  const signingMessage = createAnnounceSigningMessage(
+    payload.credentials.verificationKey,
+    payload.credentials.pseudonym,
+    payload.timestamp,
+  );
+
+  return SignatureMaterial.verify(
+    signingMessage,
+    payload.announceSignature,
+    payload.credentials.verificationKey,
+  );
 }
 
 /**

@@ -25,10 +25,12 @@ import { fromBinaryPayload } from "@/services/message-protocol-service";
 import { packetQueue } from "@/services/packet-processor-queue";
 import { decode } from "@/services/packet-protocol-service";
 import {
+  deserializeAnnouncePayload,
   deserializeEncryptedMessage,
   deserializeUpdateMessage,
   deserializeWelcomeMessage,
 } from "@/treekem/protocol";
+import { verifyAnnouncePayload } from "@/treekem/upke";
 import { BitchatPacket, FragmentType, PacketType } from "@/types/global";
 import { Mutex } from "@/utils/mutex";
 import { useEffect } from "react";
@@ -155,6 +157,10 @@ export function usePacketService() {
 
       case PacketType.AMIGO_PATH_UPDATE:
         await handleAmigoPathUpdate(packet.payload);
+        break;
+
+      case PacketType.ANNOUNCE:
+        await handleAnnounce(packet.payload);
         break;
 
       default:
@@ -339,6 +345,49 @@ export function usePacketService() {
       });
     } else {
       console.warn("Failed to decrypt message, save for future attempt");
+    }
+  };
+
+  /**
+   * Handle announce packets containing updated credentials from contacts.
+   * Verifies the announce signature to ensure the pseudonym wasn't tampered with.
+   */
+  const handleAnnounce = async (announceBytes: Uint8Array) => {
+    try {
+      const announcePayload = deserializeAnnouncePayload(announceBytes);
+
+      // Verify the announce signature - this proves the pseudonym + timestamp
+      // were signed by the holder of the private key for this verificationKey
+      if (!verifyAnnouncePayload(announcePayload)) {
+        console.warn("Received announce with invalid signature, ignoring");
+        return;
+      }
+
+      const { credentials } = announcePayload;
+
+      // Look up contact by verification key
+      const contact = await contactsRepository.getByVerificationKey(
+        credentials.verificationKey,
+      );
+
+      if (contact) {
+        // Update contact with new pseudonym from announce
+        if (contact.pseudonym !== credentials.pseudonym) {
+          await contactsRepository.update(contact.id, {
+            pseudonym: credentials.pseudonym,
+          });
+          console.log(
+            `Updated contact pseudonym: ${contact.pseudonym} -> ${credentials.pseudonym}`,
+          );
+        }
+      } else {
+        // Unknown sender - could optionally create a new unverified contact
+        console.log(
+          `Received announce from unknown contact: ${credentials.pseudonym}`,
+        );
+      }
+    } catch (error) {
+      console.error("Failed to handle announce packet:", error);
     }
   };
 
