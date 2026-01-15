@@ -279,7 +279,14 @@ export default function QRModal({ showQRModal, handleClose }: Props) {
       {/* Hidden ViewShot for capturing combined QR code with text */}
       {qrImageData && (
         <View style={styles.hiddenContainer}>
-          <ViewShot ref={viewShotRef} options={{ format: "png", quality: 1.0 }}>
+          <ViewShot
+            ref={viewShotRef}
+            options={{
+              format: "png",
+              quality: 1.0,
+              fileName: `yantagram-${member?.credential.pseudonym ?? "user"}-qr`,
+            }}
+          >
             <Svg width={330} height={410}>
               <Rect x="0" y="0" width="330" height="410" fill="white" />
               <SvgImage
