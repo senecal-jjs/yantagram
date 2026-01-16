@@ -55,7 +55,7 @@ export default function TabTwoScreen() {
   const messagesRepo = getRepo<MessagesRepository>(MessagesRepositoryToken);
   const contactsRepo = getRepo<ContactsRepository>(ContactsRepositoryToken);
   const relayPacketsRepo = getRepo<RelayPacketsRepository>(
-    RelayPacketsRepositoryToken
+    RelayPacketsRepositoryToken,
   );
   const tapCount = useRef(0);
   const tapTimer = useRef<NodeJS.Timeout | null>(null);
@@ -84,7 +84,7 @@ export default function TabTwoScreen() {
               text: "OK",
               onPress: () => router.replace("/"),
             },
-          ]
+          ],
         );
       } catch (error) {
         Alert.alert("Error", "Failed to delete messages.");
@@ -159,7 +159,7 @@ export default function TabTwoScreen() {
     });
 
     const fetchedConversations = (await Promise.all(conversationPromises)).sort(
-      (a, b) => b.rawTimestamp - a.rawTimestamp
+      (a, b) => b.rawTimestamp - a.rawTimestamp,
     );
     setConversations(fetchedConversations);
   }, [groupsRepo, messagesRepo]);
@@ -183,13 +183,13 @@ export default function TabTwoScreen() {
       Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow",
       (e) => {
         setKeyboardOffset(e.endCoordinates.height);
-      }
+      },
     );
     const keyboardWillHide = Keyboard.addListener(
       Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide",
       () => {
         setKeyboardOffset(0);
-      }
+      },
     );
 
     // Cleanup listener on unmount
@@ -220,7 +220,7 @@ export default function TabTwoScreen() {
   };
 
   const filteredConversations = conversations.filter((conversation) =>
-    conversation.name.toLowerCase().includes(searchQuery.toLowerCase())
+    conversation.name.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
   const handleDeleteChat = async (chatId: string) => {
@@ -278,8 +278,8 @@ export default function TabTwoScreen() {
               backgroundColor: searchHighlight
                 ? "rgba(60, 60, 60, 0.5)"
                 : keyboardOffset > 0
-                ? "rgba(39, 39, 39, 0.95)"
-                : "rgba(39, 39, 39, 0.3)",
+                  ? "rgba(39, 39, 39, 0.95)"
+                  : "rgba(39, 39, 39, 0.3)",
               shadowColor: searchHighlight
                 ? "#fff"
                 : "rgba(255, 255, 255, 0.1)",

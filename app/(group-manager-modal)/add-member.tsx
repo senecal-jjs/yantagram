@@ -3,9 +3,9 @@ import MemberSelection from "@/components/member-selection";
 import { useCredentials } from "@/contexts/credential-context";
 import { useGroupCreation } from "@/contexts/group-creation-context";
 import {
-    GroupMembersRepositoryToken,
-    GroupsRepositoryToken,
-    useRepos,
+  GroupMembersRepositoryToken,
+  GroupsRepositoryToken,
+  useRepos,
 } from "@/contexts/repository-context";
 import { useMessageSender } from "@/hooks/use-message-sender";
 import { Contact } from "@/repos/specs/contacts-repository";
