@@ -48,7 +48,7 @@ export default function TabLayout() {
 
   useEventListener(BleModule, "onPeripheralDisconnect", (connection) => {
     console.log("onPeripheralDisconnect: ", connection.deviceUUID);
-    connectedDevicesRepo.updateConnectionStatus(connection.deviceUUID, false);
+    connectedDevicesRepo.delete(connection.deviceUUID);
   });
 
   useEventListener(BleModule, "onReadRSSI", (connection) => {
@@ -69,7 +69,7 @@ export default function TabLayout() {
 
   useEventListener(BleModule, "onCentralUnsubscription", (connection) => {
     console.log("onCentralUnsubscription: ", connection.deviceUUID);
-    connectedDevicesRepo.updateConnectionStatus(connection.deviceUUID, false);
+    connectedDevicesRepo.delete(connection.deviceUUID);
   });
 
   return (

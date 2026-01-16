@@ -102,6 +102,16 @@ public class BleModule: Module {
        print("❌ Failed to broadcast packet")
      }
     }
+    
+    AsyncFunction("directBroadcastPacketAsync") { (value: Data, deviceUUID: String) in
+      // write packet to a specific connected device
+      if let bm = bleManager {
+        print("Direct broadcasting to \(deviceUUID)")
+        bm.directBroadcastPacket(packet: value, deviceUUID: deviceUUID)
+      } else {
+        print("❌ Failed to direct broadcast packet")
+      }
+    }
   }
 }
 
@@ -336,6 +346,41 @@ final class BleManager: NSObject {
         _ = peripheralManager?.updateValue(packet, for: ch, onSubscribedCentrals: targets)
       }
     }
+  }
+  
+  func directBroadcastPacket(packet: Data, deviceUUID: String) {
+    let peripheralStates = snapshotPeripheralStates()
+    let subscribedCentrals = snapshotSubscribedCentrals()
+    
+    // Try to find matching connected peripheral
+    if let state = peripheralStates.first(where: { $0.peripheral.identifier.uuidString == deviceUUID && $0.isConnected }) {
+      if let ch = state.characteristic {
+        bleQueue.async { [weak self] in
+          if state.peripheral.canSendWriteWithoutResponse {
+            print("✅ Direct write to peripheral \(deviceUUID)")
+            state.peripheral.writeValue(packet, for: ch, type: .withoutResponse)
+          } else {
+            print("⚠️ Peripheral \(deviceUUID) cannot send write without response")
+          }
+        }
+        return
+      }
+    }
+    
+    // Try to find matching subscribed central
+    if let central = subscribedCentrals.first(where: { $0.identifier.uuidString == deviceUUID }) {
+      if let ch = characteristic {
+        let success = peripheralManager?.updateValue(packet, for: ch, onSubscribedCentrals: [central]) ?? false
+        if success {
+          print("✅ Direct notify to central \(deviceUUID)")
+        } else {
+          print("⚠️ Failed to notify central \(deviceUUID)")
+        }
+        return
+      }
+    }
+    
+    print("❌ Device \(deviceUUID) not found in connected peripherals or subscribed centrals")
   }
   
   // MARK: Link capability snapshots (thread-safe via bleQueue)
