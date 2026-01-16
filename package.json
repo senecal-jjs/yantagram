@@ -59,6 +59,7 @@
     "react-native-svg": "15.12.1",
     "react-native-view-shot": "^4.0.3",
     "react-native-web": "~0.21.0",
+    "react-native-worklets": "0.5.1",
     "seedrandom": "^3.0.5",
     "sqlite-async": "^1.2.2",
     "sqlite3": "^5.1.7"

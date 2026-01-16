@@ -1,20 +1,20 @@
 import {
-    deserializeAnnouncePayload,
-    deserializeEncryptedMessage,
-    deserializeUpdateMessage,
-    deserializeWelcomeMessage,
+  deserializeAnnouncePayload,
+  deserializeEncryptedMessage,
+  deserializeUpdateMessage,
+  deserializeWelcomeMessage,
 } from "@/amigo/protocol";
 import { verifyAnnouncePayload } from "@/amigo/upke";
 import { useCredentials } from "@/contexts/credential-context";
 import {
-    ContactsRepositoryToken,
-    FragmentsRepositoryToken,
-    GroupMembersRepositoryToken,
-    GroupsRepositoryToken,
-    IncomingPacketsRepositoryToken,
-    MessagesRepositoryToken,
-    RelayPacketsRepositoryToken,
-    useRepos,
+  ContactsRepositoryToken,
+  FragmentsRepositoryToken,
+  GroupMembersRepositoryToken,
+  GroupsRepositoryToken,
+  IncomingPacketsRepositoryToken,
+  MessagesRepositoryToken,
+  RelayPacketsRepositoryToken,
+  useRepos,
 } from "@/contexts/repository-context";
 import { dbListener } from "@/repos/db-listener";
 import ContactsRepository from "@/repos/specs/contacts-repository";
@@ -25,9 +25,9 @@ import IncomingPacketsRepository from "@/repos/specs/incoming-packets-repository
 import MessagesRepository from "@/repos/specs/messages-repository";
 import RelayPacketsRepository from "@/repos/specs/relay-packets-repository";
 import {
-    AssembledData,
-    extractFragmentMetadata,
-    reassembleFragments,
+  AssembledData,
+  extractFragmentMetadata,
+  reassembleFragments,
 } from "@/services/frag-service";
 import { fromBinaryPayload } from "@/services/message-protocol-service";
 import { packetQueue } from "@/services/packet-processor-queue";
