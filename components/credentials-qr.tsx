@@ -1,6 +1,6 @@
+import { serializeCredentialsForQR } from "@/amigo/protocol";
+import { Credentials } from "@/amigo/types";
 import { useThemeColor } from "@/hooks/use-theme-color";
-import { serializeCredentialsForQR } from "@/treekem/protocol";
-import { Credentials } from "@/treekem/types";
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 import QRCode from "react-native-qrcode-svg";

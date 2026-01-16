@@ -67,6 +67,11 @@ export default function TabLayout() {
     );
   });
 
+  useEventListener(BleModule, "onCentralUnsubscription", (connection) => {
+    console.log("onCentralUnsubscription: ", connection.deviceUUID);
+    connectedDevicesRepo.updateConnectionStatus(connection.deviceUUID, false);
+  });
+
   return (
     <Tabs
       screenOptions={{

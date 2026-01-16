@@ -1,3 +1,10 @@
+import {
+  deserializeAnnouncePayload,
+  deserializeEncryptedMessage,
+  deserializeUpdateMessage,
+  deserializeWelcomeMessage,
+} from "@/amigo/protocol";
+import { verifyAnnouncePayload } from "@/amigo/upke";
 import { useCredentials } from "@/contexts/credential-context";
 import {
   ContactsRepositoryToken,
@@ -25,13 +32,6 @@ import {
 import { fromBinaryPayload } from "@/services/message-protocol-service";
 import { packetQueue } from "@/services/packet-processor-queue";
 import { decode } from "@/services/packet-protocol-service";
-import {
-  deserializeAnnouncePayload,
-  deserializeEncryptedMessage,
-  deserializeUpdateMessage,
-  deserializeWelcomeMessage,
-} from "@/treekem/protocol";
-import { verifyAnnouncePayload } from "@/treekem/upke";
 import { BitchatPacket, FragmentType, PacketType } from "@/types/global";
 import { Mutex } from "@/utils/mutex";
 import { useEffect } from "react";

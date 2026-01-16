@@ -1,3 +1,4 @@
+import { Member } from "@/amigo/member";
 import MemberSelection from "@/components/member-selection";
 import { useCredentials } from "@/contexts/credential-context";
 import { useGroupCreation } from "@/contexts/group-creation-context";
@@ -10,7 +11,6 @@ import { useMessageSender } from "@/hooks/use-message-sender";
 import { Contact } from "@/repos/specs/contacts-repository";
 import { GroupMembersRepository } from "@/repos/specs/group-members-repository";
 import GroupsRepository from "@/repos/specs/groups-repository";
-import { Member } from "@/treekem/member";
 import { UUID } from "@/types/utility";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";

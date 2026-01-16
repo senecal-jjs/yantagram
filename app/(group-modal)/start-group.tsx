@@ -1,3 +1,4 @@
+import { Member } from "@/amigo/member";
 import ContactList from "@/components/contact-list";
 import { BounceButton } from "@/components/ui/bounce-button";
 import { IconSymbol } from "@/components/ui/icon-symbol";
@@ -11,7 +12,6 @@ import { useMessageSender } from "@/hooks/use-message-sender";
 import { Contact } from "@/repos/specs/contacts-repository";
 import { GroupMembersRepository } from "@/repos/specs/group-members-repository";
 import GroupsRepository from "@/repos/specs/groups-repository";
-import { Member } from "@/treekem/member";
 import { UUID } from "@/types/utility";
 import { randomUUID } from "expo-crypto";
 import { useRouter } from "expo-router";

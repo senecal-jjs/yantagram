@@ -1,3 +1,4 @@
+import { deserializeCredentialsFromQR } from "@/amigo/protocol";
 import { CredentialsQR, QRCodeRef } from "@/components/credentials-qr";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useCredential } from "@/contexts/credential-context";
@@ -6,7 +7,6 @@ import {
   useRepos,
 } from "@/contexts/repository-context";
 import ContactsRepository from "@/repos/specs/contacts-repository";
-import { deserializeCredentialsFromQR } from "@/treekem/protocol";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as Sharing from "expo-sharing";
 import React, { PropsWithChildren, useRef, useState } from "react";

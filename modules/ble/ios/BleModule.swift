@@ -66,6 +66,15 @@ public class BleModule: Module {
             ]
           )
         },
+        onCentralUnsubscription: { deviceUUID, rssi in
+          self.sendEvent(
+            "onCentralUnsubscription",
+            [
+              "deviceUUID": deviceUUID,
+              "rssi": rssi
+            ]
+          )
+        },
         onReadRSSI: { deviceUUID, rssi in
           self.sendEvent(
             "onReadRSSI",
@@ -79,7 +88,7 @@ public class BleModule: Module {
     }
     
     // Defines event names that the module can send to JavaScript.
-    Events("onPeripheralReceivedWrite", "onCentralReceivedNotification", "onPeripheralConnection", "onPeripheralDisconnect", "onCentralSubscription", "onReadRSSI")
+    Events("onPeripheralReceivedWrite", "onCentralReceivedNotification", "onPeripheralConnection", "onPeripheralDisconnect", "onCentralSubscription", "onCentralUnsubscription", "onReadRSSI")
        
     // Defines a JavaScript function that always returns a Promise and whose native code
     // is by default dispatched on the different thread than the JavaScript runtime runs on.
@@ -172,6 +181,7 @@ final class BleManager: NSObject {
   let onPeripheralConnection: (String, Int?) -> Void
   let onPeripheralDisconnect: (String, Int?) -> Void
   let onCentralSubscription: (String, Int?) -> Void
+  let onCentralUnsubscription: (String, Int?) -> Void
   let onReadRSSI: (String, Int) -> Void
   
   init(
@@ -180,6 +190,7 @@ final class BleManager: NSObject {
     onPeripheralConnection: @escaping (String, Int?) -> Void,
     onPeripheralDisconnect: @escaping (String, Int?) -> Void,
     onCentralSubscription: @escaping (String, Int?) -> Void,
+    onCentralUnsubscription: @escaping (String, Int?) -> Void,
     onReadRSSI: @escaping (String, Int) -> Void
   ) {
     self.peripheralWriteObserver = writeObserver
@@ -187,6 +198,7 @@ final class BleManager: NSObject {
     self.onPeripheralConnection = onPeripheralConnection
     self.onPeripheralDisconnect = onPeripheralDisconnect
     self.onCentralSubscription = onCentralSubscription
+    self.onCentralUnsubscription = onCentralUnsubscription
     self.onReadRSSI = onReadRSSI
     super.init()
     
@@ -483,9 +495,7 @@ extension BleManager: CBCentralManagerDelegate {
       print("✅ Connected: \(peripheral.name ?? "Unknown") [\(peripheralId)]")
       
       peripheral.readRSSI()
-      
-      onPeripheralConnection(peripheralId, nil)
-      
+       
       // discover services
       peripheral.discoverServices([BleManager.serviceUUID])
     }
@@ -680,6 +690,9 @@ extension BleManager: CBPeripheralManagerDelegate {
         // Remove from tracked centrals
       subscribedCentrals.removeAll { $0.identifier == central.identifier }
       
+      // Notify JavaScript about the unsubscription
+      onCentralUnsubscription(central.identifier.uuidString, nil)
+      
       // Ensure we're still advertising for other devices to find us
       if peripheral.isAdvertising == false {
         peripheral.startAdvertising(buildAdvertisementData())
@@ -810,6 +823,8 @@ extension BleManager: CBPeripheralDelegate {
             centralManager?.cancelPeripheralConnection(peripheral)
             return
         }
+
+        onPeripheralConnection(peripheral.identifier.uuidString, nil)
         
         // Discovering BLE characteristics
         peripheral.discoverCharacteristics([BleManager.characteristicUUID], for: service)

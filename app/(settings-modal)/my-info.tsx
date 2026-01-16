@@ -1,9 +1,9 @@
+import { serializeAnnouncePayload } from "@/amigo/protocol";
+import { Credentials } from "@/amigo/types";
 import { BackButton } from "@/components/ui/back-button";
 import { useCredentials } from "@/contexts/credential-context";
 import BleModule from "@/modules/ble/src/BleModule";
 import { encode } from "@/services/packet-protocol-service";
-import { serializeAnnouncePayload } from "@/treekem/protocol";
-import { Credentials } from "@/treekem/types";
 import { PacketType } from "@/types/global";
 import { useRouter } from "expo-router";
 import { useState } from "react";

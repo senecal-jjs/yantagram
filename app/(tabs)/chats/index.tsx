@@ -255,12 +255,18 @@ export default function TabTwoScreen() {
   return (
     <SafeAreaProvider>
       <SafeAreaView style={styles.mainContainer}>
-        <BounceButton style={styles.logoContainer} onPress={onSettingsPress}>
-          <View style={styles.logoButton}>
-            <View style={styles.logoAvatar}></View>
-            <Text style={styles.logoText}>Yantagram</Text>
-          </View>
-        </BounceButton>
+        <View style={styles.header}>
+          <BounceButton style={styles.logoContainer} onPress={onSettingsPress}>
+            <View style={styles.logoButton}>
+              <View style={styles.logoAvatar}></View>
+              <Text style={styles.logoText}>Yantagram</Text>
+            </View>
+          </BounceButton>
+
+          <BounceButton style={styles.panicButton} onPress={handlePanicButton}>
+            <Text style={{ color: "red" }}>WIPE</Text>
+          </BounceButton>
+        </View>
 
         <View
           style={[
@@ -347,7 +353,7 @@ export default function TabTwoScreen() {
             showsVerticalScrollIndicator={false}
             keyExtractor={(item) => item.id}
             renderItem={renderItem}
-            style={{ marginTop: 75 }}
+            style={{ marginTop: 20 }}
             contentContainerStyle={{ paddingBottom: 100 }}
           />
         )}
@@ -382,12 +388,6 @@ export default function TabTwoScreen() {
           </BounceButton>
         </View>
 
-        <View style={styles.panicButtonContainer}>
-          <BounceButton style={styles.panicButton} onPress={handlePanicButton}>
-            <Text style={{ color: "red" }}>WIPE</Text>
-          </BounceButton>
-        </View>
-
         <QRModal
           showQRModal={showQRModal}
           handleClose={() => setShowQRModal(false)}
@@ -402,14 +402,20 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#090909ff",
   },
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    zIndex: 1001,
+    elevation: 1001,
+  },
   logoButton: {
     flexDirection: "row",
     alignItems: "center",
   },
   logoContainer: {
-    position: "absolute",
-    top: 20,
-    left: 20,
     backgroundColor: "#272727ff",
     padding: 10,
     borderRadius: 20,
@@ -424,8 +430,6 @@ const styles = StyleSheet.create({
     },
     shadowOpacity: 1,
     shadowRadius: 2,
-    zIndex: 1001,
-    elevation: 1001,
   },
   logoAvatar: {
     width: 25,
@@ -509,11 +513,6 @@ const styles = StyleSheet.create({
     bottom: 20,
     left: 20,
   },
-  panicButtonContainer: {
-    position: "absolute",
-    top: 80,
-    right: 20,
-  },
   panicButton: {
     width: 50,
     height: 50,
@@ -575,7 +574,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 10,
-    marginTop: 70,
   },
   emptyText: {
     fontSize: 18,
