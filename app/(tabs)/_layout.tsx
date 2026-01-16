@@ -78,10 +78,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: "Rooms",
-          tabBarIcon: ({ color }) => (
-            <IconSymbol size={28} name="house.fill" color={color} />
-          ),
+          href: null, // Hide from tab bar
         }}
       />
       <Tabs.Screen
@@ -91,6 +88,15 @@ export default function TabLayout() {
           tabBarLabel: "Chats",
           tabBarIcon: ({ color }) => (
             <IconSymbol size={28} name="message" color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="rooms"
+        options={{
+          title: "Rooms",
+          tabBarIcon: ({ color }) => (
+            <IconSymbol size={28} name="house.fill" color={color} />
           ),
         }}
       />

@@ -1,4 +1,4 @@
-import { CredentialsQR } from "@/components/credentials-qr";
+import { CredentialsQR, QRCodeRef } from "@/components/credentials-qr";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useCredential } from "@/contexts/credential-context";
 import {
@@ -8,9 +8,17 @@ import {
 import ContactsRepository from "@/repos/specs/contacts-repository";
 import { deserializeCredentialsFromQR } from "@/treekem/protocol";
 import { CameraView, useCameraPermissions } from "expo-camera";
+import * as Sharing from "expo-sharing";
 import React, { PropsWithChildren, useRef, useState } from "react";
 import { Alert, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
+import Svg, {
+  Rect,
+  Image as SvgImage,
+  Text as SvgText,
+  TSpan,
+} from "react-native-svg";
+import ViewShot from "react-native-view-shot";
 import { BounceButton } from "./ui/bounce-button";
 
 type Props = PropsWithChildren<{
@@ -21,11 +29,14 @@ type Props = PropsWithChildren<{
 export default function QRModal({ showQRModal, handleClose }: Props) {
   const [viewMode, setViewMode] = useState<"show" | "scan">("show");
   const [scannedData, setScannedData] = useState<string | null>(null);
+  const [qrImageData, setQrImageData] = useState<string | null>(null);
   const [permission, requestPermission] = useCameraPermissions();
   const { member } = useCredential();
   const { getRepo } = useRepos();
   const contactsRepo = getRepo<ContactsRepository>(ContactsRepositoryToken);
   const isProcessingRef = useRef(false);
+  const qrCodeRef = useRef<QRCodeRef | null>(null);
+  const viewShotRef = useRef<ViewShot | null>(null);
 
   const handleBarCodeScanned = async ({ data }: { data: string }) => {
     // Prevent multiple scans
@@ -72,6 +83,50 @@ export default function QRModal({ showQRModal, handleClose }: Props) {
       ]);
     } finally {
       isProcessingRef.current = false;
+    }
+  };
+
+  const handleShare = async () => {
+    if (!member || !qrCodeRef.current) return;
+
+    try {
+      // Get base64 data from QR code
+      qrCodeRef.current.toDataURL(async (qrData: string) => {
+        try {
+          // Set the QR image data to trigger render of the hidden SVG
+          setQrImageData(qrData);
+
+          // Wait a bit for the view to render
+          await new Promise((resolve) => setTimeout(resolve, 100));
+
+          // Capture the combined SVG as a PNG using ViewShot
+          if (viewShotRef.current?.capture) {
+            const uri = await viewShotRef.current.capture();
+
+            // Share the captured image
+            if (await Sharing.isAvailableAsync()) {
+              await Sharing.shareAsync(uri, {
+                mimeType: "image/png",
+                dialogTitle: "Share QR Code",
+              });
+            } else {
+              Alert.alert(
+                "Sharing not available",
+                "Unable to share on this device.",
+              );
+            }
+          }
+
+          // Clear the QR image data
+          setQrImageData(null);
+        } catch (error) {
+          console.error("Failed to share image:", error);
+          setQrImageData(null);
+          Alert.alert("Error", "Failed to share QR code image.");
+        }
+      });
+    } catch (error) {
+      console.error("Failed to share:", error);
     }
   };
 
@@ -148,9 +203,13 @@ export default function QRModal({ showQRModal, handleClose }: Props) {
                 credentials={member.credential}
                 title="Scan to Add Me"
                 size={250}
+                getRef={(ref) => (qrCodeRef.current = ref)}
               />
               <View style={styles.shareButtonContainer}>
-                <Pressable style={styles.shareButton}>
+                <Pressable
+                  style={styles.shareButton}
+                  onPress={() => handleShare()}
+                >
                   <IconSymbol
                     size={28}
                     name="square.and.arrow.up"
@@ -216,11 +275,56 @@ export default function QRModal({ showQRModal, handleClose }: Props) {
           )}
         </SafeAreaView>
       </SafeAreaProvider>
+
+      {/* Hidden ViewShot for capturing combined QR code with text */}
+      {qrImageData && (
+        <View style={styles.hiddenContainer}>
+          <ViewShot
+            ref={viewShotRef}
+            options={{
+              format: "png",
+              quality: 1.0,
+              fileName: `yantagram-${member?.credential.pseudonym ?? "user"}-qr`,
+            }}
+          >
+            <Svg width={330} height={410}>
+              <Rect x="0" y="0" width="330" height="410" fill="white" />
+              <SvgImage
+                href={`data:image/png;base64,${qrImageData}`}
+                x="40"
+                y="40"
+                width="250"
+                height="250"
+              />
+              <SvgText
+                x="165"
+                y="325"
+                textAnchor="middle"
+                fontFamily="Arial"
+                fontSize="14"
+                fill="black"
+              >
+                <TSpan x="165" dy="0">
+                  Scan this QR code with your phone
+                </TSpan>
+                <TSpan x="165" dy="22">
+                  to chat with me on Yantagram
+                </TSpan>
+              </SvgText>
+            </Svg>
+          </ViewShot>
+        </View>
+      )}
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
+  hiddenContainer: {
+    position: "absolute",
+    left: -9999,
+    top: -9999,
+  },
   cameraOverlay: {
     ...StyleSheet.absoluteFillObject,
     // justifyContent: "center",

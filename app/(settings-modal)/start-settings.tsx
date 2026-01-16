@@ -2,13 +2,26 @@ import { BounceButton } from "@/components/ui/bounce-button";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useCredentials } from "@/contexts/credential-context";
 import {
+  ConnectedDevicesRepositoryToken,
   MessagesRepositoryToken,
   useRepos,
 } from "@/contexts/repository-context";
 import { useSettings } from "@/contexts/settings-context";
+import ConnectedDevicesRepository, {
+  ConnectedDevice,
+} from "@/repos/specs/connected-devices-repository";
 import MessagesRepository from "@/repos/specs/messages-repository";
 import { useRouter } from "expo-router";
-import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import React, { useEffect, useState } from "react";
+import {
+  Alert,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 
 export default function StartSettingsScreen() {
@@ -16,7 +29,43 @@ export default function StartSettingsScreen() {
   const { resetSettings } = useSettings();
   const { getRepo } = useRepos();
   const messagesRepo = getRepo<MessagesRepository>(MessagesRepositoryToken);
+  const connectedDevicesRepo = getRepo<ConnectedDevicesRepository>(
+    ConnectedDevicesRepositoryToken,
+  );
   const router = useRouter();
+  const [connectedDevices, setConnectedDevices] = useState<ConnectedDevice[]>(
+    [],
+  );
+  const [showDevicesModal, setShowDevicesModal] = useState(false);
+
+  useEffect(() => {
+    const fetchConnectedDevices = async () => {
+      const devices = await connectedDevicesRepo.getAllConnected();
+      setConnectedDevices(devices);
+    };
+
+    fetchConnectedDevices();
+
+    // Refresh device count every 5 seconds
+    const interval = setInterval(fetchConnectedDevices, 5000);
+    return () => clearInterval(interval);
+  }, [connectedDevicesRepo]);
+
+  const getRssiLabel = (rssi: number | null) => {
+    if (rssi === null) return "Unknown";
+    if (rssi >= -50) return "Excellent";
+    if (rssi >= -60) return "Good";
+    if (rssi >= -70) return "Fair";
+    return "Weak";
+  };
+
+  const getRssiColor = (rssi: number | null) => {
+    if (rssi === null) return "#888";
+    if (rssi >= -50) return "#4CAF50";
+    if (rssi >= -60) return "#8BC34A";
+    if (rssi >= -70) return "#FFC107";
+    return "#FF5722";
+  };
 
   const deleteAllAppData = () => {
     Alert.alert(
@@ -91,7 +140,21 @@ export default function StartSettingsScreen() {
     <SafeAreaProvider style={{ backgroundColor: "#1d1d1dff" }}>
       <SafeAreaView style={styles.container}>
         <View style={styles.topBar}>
-          <View style={styles.spacer} />
+          <Pressable
+            style={styles.meshContainer}
+            onPress={() => setShowDevicesModal(true)}
+          >
+            <IconSymbol
+              size={24}
+              name="dot.radiowaves.left.and.right"
+              color={"#5766b1ff"}
+            />
+            <View style={styles.meshBadge}>
+              <Text style={styles.meshBadgeText}>
+                {connectedDevices.length}
+              </Text>
+            </View>
+          </Pressable>
           <View style={styles.headerContainer}>
             <View style={styles.logoAvatar}></View>
             <Text style={styles.headerText}>Yantagram</Text>
@@ -209,6 +272,76 @@ export default function StartSettingsScreen() {
           </Text>
         </View>
       </SafeAreaView>
+
+      {/* Connected Devices Modal */}
+      <Modal
+        visible={showDevicesModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowDevicesModal(false)}
+      >
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setShowDevicesModal(false)}
+        >
+          <Pressable
+            style={styles.devicesModalContent}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <View style={styles.devicesModalHeader}>
+              <Text style={styles.devicesModalTitle}>Nearby Devices</Text>
+              <Pressable onPress={() => setShowDevicesModal(false)}>
+                <IconSymbol size={24} name="xmark" color="#888" />
+              </Pressable>
+            </View>
+            <ScrollView style={styles.devicesList}>
+              {connectedDevices.length === 0 ? (
+                <Text style={styles.noDevicesText}>
+                  No devices connected nearby
+                </Text>
+              ) : (
+                connectedDevices.map((device) => (
+                  <View key={device.id} style={styles.deviceItem}>
+                    <View style={styles.deviceInfo}>
+                      <IconSymbol
+                        size={20}
+                        name="iphone.radiowaves.left.and.right"
+                        color="#5766b1ff"
+                      />
+                      <Text style={styles.deviceUUID} numberOfLines={1}>
+                        {device.deviceUUID.substring(0, 8)}...
+                      </Text>
+                    </View>
+                    <View style={styles.rssiContainer}>
+                      <View
+                        style={[
+                          styles.rssiIndicator,
+                          {
+                            backgroundColor: getRssiColor(device.lastSeenRSSI),
+                          },
+                        ]}
+                      />
+                      <Text style={styles.rssiText}>
+                        {device.lastSeenRSSI !== null
+                          ? `${device.lastSeenRSSI} dBm`
+                          : "N/A"}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.rssiLabel,
+                          { color: getRssiColor(device.lastSeenRSSI) },
+                        ]}
+                      >
+                        {getRssiLabel(device.lastSeenRSSI)}
+                      </Text>
+                    </View>
+                  </View>
+                ))
+              )}
+            </ScrollView>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </SafeAreaProvider>
   );
 }
@@ -280,8 +413,29 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: 15,
   },
-  spacer: {
-    width: 46, // Same width as close button to center the header
+  meshContainer: {
+    width: 46,
+    height: 36,
+    justifyContent: "center",
+    alignItems: "center",
+    marginLeft: 10,
+  },
+  meshBadge: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    backgroundColor: "#5766b1ff",
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 4,
+  },
+  meshBadgeText: {
+    color: "white",
+    fontSize: 11,
+    fontWeight: "700",
   },
   closeButton: {
     width: 36,
@@ -341,5 +495,76 @@ const styles = StyleSheet.create({
   warningText: {
     color: "#ffb300",
     fontSize: 14,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  devicesModalContent: {
+    backgroundColor: "#2a2a2a",
+    borderRadius: 16,
+    width: "85%",
+    maxHeight: "60%",
+    padding: 20,
+  },
+  devicesModalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  devicesModalTitle: {
+    color: "white",
+    fontSize: 18,
+    fontWeight: "600",
+  },
+  devicesList: {
+    maxHeight: 300,
+  },
+  noDevicesText: {
+    color: "#888",
+    fontSize: 14,
+    textAlign: "center",
+    paddingVertical: 20,
+  },
+  deviceItem: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "#333",
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 8,
+  },
+  deviceInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+  },
+  deviceUUID: {
+    color: "white",
+    fontSize: 14,
+    marginLeft: 10,
+    flex: 1,
+  },
+  rssiContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  rssiIndicator: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  rssiText: {
+    color: "#888",
+    fontSize: 12,
+  },
+  rssiLabel: {
+    fontSize: 12,
+    fontWeight: "500",
   },
 });

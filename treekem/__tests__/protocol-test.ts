@@ -9,7 +9,11 @@ test("serialize/deserialize welcome message for transit over wire", async () => 
   member.createGroup(2, "anon", 1);
   member.addToGroup("anon");
   const member2 = await Member.create("alice");
-  const welcome = await member.sendWelcomeMessage(member2.credential, "anon");
+  const welcome = await member.sendWelcomeMessage(
+    member2.credential,
+    "anon",
+    "test",
+  );
 
   const serializedWelcome = serializeWelcomeMessage(welcome);
   const deserializedWelcome = deserializeWelcomeMessage(serializedWelcome);

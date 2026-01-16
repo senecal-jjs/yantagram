@@ -49,6 +49,18 @@ class DBListener extends EventEmitter {
   removeGroupUpdateListener(callback: () => void) {
     this.off("groups:updated", callback);
   }
+
+  notifyContactUpdate() {
+    this.emit("contacts:updated");
+  }
+
+  onContactUpdate(callback: () => void) {
+    this.on("contacts:updated", callback);
+  }
+
+  removeContactUpdateListener(callback: () => void) {
+    this.off("contacts:updated", callback);
+  }
 }
 
 export const dbListener = DBListener.getInstance();

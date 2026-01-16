@@ -1,12 +1,51 @@
 import { BackButton } from "@/components/ui/back-button";
 import { useCredentials } from "@/contexts/credential-context";
+import BleModule from "@/modules/ble/src/BleModule";
+import { encode } from "@/services/packet-protocol-service";
+import { serializeAnnouncePayload } from "@/treekem/protocol";
+import { Credentials } from "@/treekem/types";
+import { PacketType } from "@/types/global";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import { StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 
+/**
+ * Broadcast an announce packet with credentials to notify contacts of updates.
+ * The announce payload is signed to prevent tampering with the pseudonym.
+ */
+const broadcastAnnounce = async (
+  updatedCredentials: Credentials,
+  signingKey: Uint8Array,
+) => {
+  try {
+    const timestamp = Date.now();
+    const payload = serializeAnnouncePayload(
+      updatedCredentials,
+      timestamp,
+      signingKey,
+    );
+    const packet = {
+      version: 1,
+      type: PacketType.ANNOUNCE,
+      timestamp,
+      payload,
+      allowedHops: 3,
+    };
+
+    const encoded = encode(packet);
+    if (encoded) {
+      await BleModule.broadcastPacketAsync(encoded, []);
+      console.log("Broadcast signed announce packet with updated pseudonym");
+    }
+  } catch (error) {
+    console.error("Failed to broadcast announce:", error);
+    // Don't throw - announce failure shouldn't block pseudonym update
+  }
+};
+
 export default function MyInfoScreen() {
-  const { credentials, updatePseudonym } = useCredentials();
+  const { credentials, member, updatePseudonym } = useCredentials();
   const [pseudonym, setPseudonym] = useState(credentials?.pseudonym || "");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
@@ -16,6 +55,16 @@ export default function MyInfoScreen() {
     console.log("Saving pseudonym:", pseudonym);
     try {
       await updatePseudonym(pseudonym);
+      // Broadcast signed announce packet with updated credentials to contacts
+      if (credentials && member) {
+        await broadcastAnnounce(
+          {
+            ...credentials,
+            pseudonym,
+          },
+          member.signingKey,
+        );
+      }
     } finally {
       setLoading(false);
     }
@@ -52,7 +101,7 @@ export default function MyInfoScreen() {
             }}
           />
           <Text style={styles.fieldHeader}>
-            This is how other users will identity you in chats.
+            This is how other users will identify you in chats.
           </Text>
         </View>
       </SafeAreaView>
@@ -66,6 +115,7 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   fieldHeader: {
+    paddingTop: 2,
     color: "#b6b6b6ff",
     marginBottom: 1,
   },
