@@ -1,4 +1,4 @@
-import { Credentials } from "@/treekem/types";
+import { Credentials } from "@/amigo/types";
 
 export interface Contact {
   id: number;

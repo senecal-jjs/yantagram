@@ -1,4 +1,4 @@
-import { Credentials } from "@/treekem/types";
+import { Credentials } from "@/amigo/types";
 import { hexStringToUint8Array, uint8ArrayToHexString } from "@/utils/string";
 import * as SQLite from "expo-sqlite";
 import ContactsRepository, { Contact } from "../specs/contacts-repository";

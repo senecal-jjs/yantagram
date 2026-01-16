@@ -1,28 +1,28 @@
+import { Member } from "@/amigo/member";
 import { BackButton } from "@/components/ui/back-button";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useCredentials } from "@/contexts/credential-context";
 import { useGroupCreation } from "@/contexts/group-creation-context";
 import {
-  GroupMembersRepositoryToken,
-  GroupsRepositoryToken,
-  useRepos,
+    GroupMembersRepositoryToken,
+    GroupsRepositoryToken,
+    useRepos,
 } from "@/contexts/repository-context";
 import { useMessageSender } from "@/hooks/use-message-sender";
 import { Contact } from "@/repos/specs/contacts-repository";
 import { GroupMembersRepository } from "@/repos/specs/group-members-repository";
 import GroupsRepository from "@/repos/specs/groups-repository";
-import { Member } from "@/treekem/member";
 import { UUID } from "@/types/utility";
 import { randomUUID } from "expo-crypto";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
-  FlatList,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
+    FlatList,
+    Pressable,
+    StyleSheet,
+    Text,
+    TextInput,
+    View,
 } from "react-native";
 import { Wave } from "react-native-animated-spinkit";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";

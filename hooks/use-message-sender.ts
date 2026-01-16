@@ -1,8 +1,14 @@
+import {
+    serializeEncryptedMessage,
+    serializeUpdateMessage,
+    serializeWelcomeMessage,
+} from "@/amigo/protocol";
+import { UpdateMessage, WelcomeMessage } from "@/amigo/types";
 import { useCredentials } from "@/contexts/credential-context";
 import {
-  MessagesRepositoryToken,
-  OutgoingMessagesRepositoryToken,
-  useRepos,
+    MessagesRepositoryToken,
+    OutgoingMessagesRepositoryToken,
+    useRepos,
 } from "@/contexts/repository-context";
 import BleModule from "@/modules/ble/src/BleModule";
 import MessagesRepository from "@/repos/specs/messages-repository";
@@ -11,16 +17,10 @@ import { fragmentPayload } from "@/services/frag-service";
 import { toBinaryPayload } from "@/services/message-protocol-service";
 import { encode } from "@/services/packet-protocol-service";
 import {
-  serializeEncryptedMessage,
-  serializeUpdateMessage,
-  serializeWelcomeMessage,
-} from "@/treekem/protocol";
-import { UpdateMessage, WelcomeMessage } from "@/treekem/types";
-import {
-  BitchatPacket,
-  FragmentType,
-  Message,
-  PacketType,
+    BitchatPacket,
+    FragmentType,
+    Message,
+    PacketType,
 } from "@/types/global";
 import { sleep } from "@/utils/sleep";
 import Constants from "expo-constants";
