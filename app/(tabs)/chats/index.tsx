@@ -55,7 +55,7 @@ export default function TabTwoScreen() {
   const messagesRepo = getRepo<MessagesRepository>(MessagesRepositoryToken);
   const contactsRepo = getRepo<ContactsRepository>(ContactsRepositoryToken);
   const relayPacketsRepo = getRepo<RelayPacketsRepository>(
-    RelayPacketsRepositoryToken,
+    RelayPacketsRepositoryToken
   );
   const tapCount = useRef(0);
   const tapTimer = useRef<NodeJS.Timeout | null>(null);
@@ -84,7 +84,7 @@ export default function TabTwoScreen() {
               text: "OK",
               onPress: () => router.replace("/"),
             },
-          ],
+          ]
         );
       } catch (error) {
         Alert.alert("Error", "Failed to delete messages.");
@@ -159,7 +159,7 @@ export default function TabTwoScreen() {
     });
 
     const fetchedConversations = (await Promise.all(conversationPromises)).sort(
-      (a, b) => b.rawTimestamp - a.rawTimestamp,
+      (a, b) => b.rawTimestamp - a.rawTimestamp
     );
     setConversations(fetchedConversations);
   }, [groupsRepo, messagesRepo]);
@@ -183,13 +183,13 @@ export default function TabTwoScreen() {
       Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow",
       (e) => {
         setKeyboardOffset(e.endCoordinates.height);
-      },
+      }
     );
     const keyboardWillHide = Keyboard.addListener(
       Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide",
       () => {
         setKeyboardOffset(0);
-      },
+      }
     );
 
     // Cleanup listener on unmount
@@ -220,7 +220,7 @@ export default function TabTwoScreen() {
   };
 
   const filteredConversations = conversations.filter((conversation) =>
-    conversation.name.toLowerCase().includes(searchQuery.toLowerCase()),
+    conversation.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const handleDeleteChat = async (chatId: string) => {
@@ -255,12 +255,18 @@ export default function TabTwoScreen() {
   return (
     <SafeAreaProvider>
       <SafeAreaView style={styles.mainContainer}>
-        <BounceButton style={styles.logoContainer} onPress={onSettingsPress}>
-          <View style={styles.logoButton}>
-            <View style={styles.logoAvatar}></View>
-            <Text style={styles.logoText}>Yantagram</Text>
-          </View>
-        </BounceButton>
+        <View style={styles.header}>
+          <BounceButton style={styles.logoContainer} onPress={onSettingsPress}>
+            <View style={styles.logoButton}>
+              <View style={styles.logoAvatar}></View>
+              <Text style={styles.logoText}>Yantagram</Text>
+            </View>
+          </BounceButton>
+
+          <BounceButton style={styles.panicButton} onPress={handlePanicButton}>
+            <Text style={{ color: "red" }}>WIPE</Text>
+          </BounceButton>
+        </View>
 
         <View
           style={[
@@ -272,8 +278,8 @@ export default function TabTwoScreen() {
               backgroundColor: searchHighlight
                 ? "rgba(60, 60, 60, 0.5)"
                 : keyboardOffset > 0
-                  ? "rgba(39, 39, 39, 0.95)"
-                  : "rgba(39, 39, 39, 0.3)",
+                ? "rgba(39, 39, 39, 0.95)"
+                : "rgba(39, 39, 39, 0.3)",
               shadowColor: searchHighlight
                 ? "#fff"
                 : "rgba(255, 255, 255, 0.1)",
@@ -347,7 +353,7 @@ export default function TabTwoScreen() {
             showsVerticalScrollIndicator={false}
             keyExtractor={(item) => item.id}
             renderItem={renderItem}
-            style={{ marginTop: 75 }}
+            style={{ marginTop: 20 }}
             contentContainerStyle={{ paddingBottom: 100 }}
           />
         )}
@@ -382,12 +388,6 @@ export default function TabTwoScreen() {
           </BounceButton>
         </View>
 
-        <View style={styles.panicButtonContainer}>
-          <BounceButton style={styles.panicButton} onPress={handlePanicButton}>
-            <Text style={{ color: "red" }}>WIPE</Text>
-          </BounceButton>
-        </View>
-
         <QRModal
           showQRModal={showQRModal}
           handleClose={() => setShowQRModal(false)}
@@ -402,14 +402,20 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#090909ff",
   },
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    zIndex: 1001,
+    elevation: 1001,
+  },
   logoButton: {
     flexDirection: "row",
     alignItems: "center",
   },
   logoContainer: {
-    position: "absolute",
-    top: 20,
-    left: 20,
     backgroundColor: "#272727ff",
     padding: 10,
     borderRadius: 20,
@@ -424,8 +430,6 @@ const styles = StyleSheet.create({
     },
     shadowOpacity: 1,
     shadowRadius: 2,
-    zIndex: 1001,
-    elevation: 1001,
   },
   logoAvatar: {
     width: 25,
@@ -509,11 +513,6 @@ const styles = StyleSheet.create({
     bottom: 20,
     left: 20,
   },
-  panicButtonContainer: {
-    position: "absolute",
-    top: 80,
-    right: 20,
-  },
   panicButton: {
     width: 50,
     height: 50,
@@ -575,7 +574,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 10,
-    marginTop: 70,
   },
   emptyText: {
     fontSize: 18,

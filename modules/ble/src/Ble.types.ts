@@ -4,6 +4,7 @@ export type BleModuleEvents = {
   onPeripheralConnection: (connection: Connection) => void;
   onPeripheralDisconnect: (connection: Connection) => void;
   onCentralSubscription: (connection: Connection) => void;
+  onCentralUnsubscription: (connection: Connection) => void;
   onReadRSSI: (connection: Connection) => void;
 };
 
