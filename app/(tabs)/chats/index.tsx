@@ -511,7 +511,7 @@ const styles = StyleSheet.create({
   },
   panicButtonContainer: {
     position: "absolute",
-    top: 68,
+    top: 80,
     right: 20,
   },
   panicButton: {

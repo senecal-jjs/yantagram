@@ -101,7 +101,7 @@ export default function MyInfoScreen() {
             }}
           />
           <Text style={styles.fieldHeader}>
-            This is how other users will identity you in chats.
+            This is how other users will identify you in chats.
           </Text>
         </View>
       </SafeAreaView>
@@ -115,6 +115,7 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   fieldHeader: {
+    paddingTop: 2,
     color: "#b6b6b6ff",
     marginBottom: 1,
   },
