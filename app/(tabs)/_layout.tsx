@@ -29,7 +29,7 @@ export default function TabLayout() {
   );
   const syncManager = getGossipSyncManager();
 
-  // Set up queue processor
+  // Set up queue processor and periodic cleanup
   useEffect(() => {
     // Set up the delegate to send packets via BLE
     const delegate: GossipSyncDelegate = {
@@ -49,6 +49,21 @@ export default function TabLayout() {
 
     syncManager.setDelegate(delegate);
     syncManager.start();
+
+    // Periodically clean up stale connected devices (not seen in 30 minutes)
+    const STALE_DEVICE_THRESHOLD_MS = 30 * 60 * 1000; // 30 minutes
+    const cleanupInterval = setInterval(async () => {
+      const deleted = await connectedDevicesRepo.deleteStale(
+        STALE_DEVICE_THRESHOLD_MS,
+      );
+      if (deleted > 0) {
+        console.log(`[DeviceCleanup] Removed ${deleted} stale devices`);
+      }
+    }, 60 * 1000); // Run every minute
+
+    return () => {
+      clearInterval(cleanupInterval);
+    };
   });
 
   useEventListener(BleModule, "onPeripheralReceivedWrite", (message) => {
