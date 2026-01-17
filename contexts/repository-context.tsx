@@ -7,6 +7,7 @@ import SQIncomingPacketsRepository from "@/repos/impls/sq-incoming-packets-repos
 import SQMessagesRepository from "@/repos/impls/sq-messages-repository";
 import SQOutgoingMessagesRepository from "@/repos/impls/sq-outgoing-messages-repository";
 import SQRelayPacketsRepository from "@/repos/impls/sq-relay-packets-repository";
+import SQSyncPacketsRepository from "@/repos/impls/sq-sync-packets-repository";
 import Repository from "@/repos/specs/repository";
 import { useSQLiteContext } from "expo-sqlite";
 import React, { createContext, useContext } from "react";
@@ -27,6 +28,7 @@ export const RelayPacketsRepositoryToken = Symbol("RelayPacketsRepository");
 export const ConnectedDevicesRepositoryToken = Symbol(
   "ConnectedDevicesRepository",
 );
+export const SyncPacketsRepositoryToken = Symbol("SyncPacketsRepository");
 
 interface RepositoryContextType {
   repos: Map<symbol, Repository>;
@@ -62,6 +64,7 @@ export const RepositoryProvider: React.FC<{ children: React.ReactNode }> = ({
       ConnectedDevicesRepositoryToken,
       new SQConnectedDevicesRepository(db),
     );
+    repoMap.set(SyncPacketsRepositoryToken, new SQSyncPacketsRepository(db));
     return repoMap;
   }, [db]);
 

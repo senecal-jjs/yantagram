@@ -721,16 +721,26 @@ extension BleManager: CBPeripheralManagerDelegate {
     public func peripheralManager(_ peripheral: CBPeripheralManager, central: CBCentral, didSubscribeTo characteristic: CBCharacteristic) {
         print("✅ Central subscribed: \(central.identifier.uuidString) to characteristic: \(characteristic.uuid)")
         
+        // Only track centrals that subscribe to our Yantagram characteristic
+        guard characteristic.uuid == BleManager.characteristicUUID else {
+            print("⚠️ Central subscribed to unknown characteristic, ignoring")
+            return
+        }
+        
         // Track subscribed centrals
         // Can now send notifications to this central
       subscribedCentrals.append(central)
       
-      // TODO: send announce?
       onCentralSubscription(central.identifier.uuidString, nil)
     }
     
     public func peripheralManager(_ peripheral: CBPeripheralManager, central: CBCentral, didUnsubscribeFrom characteristic: CBCharacteristic) {
         print("ℹ️ Central unsubscribed: \(central.identifier.uuidString) from characteristic: \(characteristic.uuid)")
+        
+        // Only handle unsubscribe for our Yantagram characteristic
+        guard characteristic.uuid == BleManager.characteristicUUID else {
+            return
+        }
         
         // Remove from tracked centrals
       subscribedCentrals.removeAll { $0.identifier == central.identifier }

@@ -14,6 +14,7 @@ import {
   IncomingPacketsRepositoryToken,
   MessagesRepositoryToken,
   RelayPacketsRepositoryToken,
+  SyncPacketsRepositoryToken,
   useRepos,
 } from "@/contexts/repository-context";
 import BleModule from "@/modules/ble";
@@ -25,6 +26,7 @@ import GroupsRepository from "@/repos/specs/groups-repository";
 import IncomingPacketsRepository from "@/repos/specs/incoming-packets-repository";
 import MessagesRepository from "@/repos/specs/messages-repository";
 import RelayPacketsRepository from "@/repos/specs/relay-packets-repository";
+import SyncPacketsRepository from "@/repos/specs/sync-packets-repository";
 import {
   AssembledData,
   extractFragmentMetadata,
@@ -68,6 +70,9 @@ export function usePacketService() {
   const relayPacketsRepository = getRepo<RelayPacketsRepository>(
     RelayPacketsRepositoryToken,
   );
+  const syncPacketsRepository = getRepo<SyncPacketsRepository>(
+    SyncPacketsRepositoryToken,
+  );
   const { member, saveMember } = useCredentials();
   const { sendAmigoPathUpdate } = useMessageSender();
   const syncManager = getGossipSyncManager();
@@ -76,6 +81,9 @@ export function usePacketService() {
   // Set up queue processor
   useEffect(() => {
     packetQueue.setProcessor(processPacket);
+
+    // Set up the repository and delegate for the sync manager
+    syncManager.setRepository(syncPacketsRepository);
 
     // Set up the delegate to send packets via BLE
     const delegate: GossipSyncDelegate = {
