@@ -16,6 +16,7 @@ import {
   RelayPacketsRepositoryToken,
   useRepos,
 } from "@/contexts/repository-context";
+import BleModule from "@/modules/ble";
 import { dbListener } from "@/repos/db-listener";
 import ContactsRepository from "@/repos/specs/contacts-repository";
 import FragmentsRepository from "@/repos/specs/fragments-repository";
@@ -29,8 +30,13 @@ import {
   extractFragmentMetadata,
   reassembleFragments,
 } from "@/services/frag-service";
+import {
+  getGossipSyncManager,
+  GossipSyncDelegate,
+} from "@/services/gossip-sync-manager";
 import { fromBinaryPayload } from "@/services/message-protocol-service";
 import { packetQueue } from "@/services/packet-processor-queue";
+import * as PacketProtocolService from "@/services/packet-protocol-service";
 import { decode } from "@/services/packet-protocol-service";
 import { BitchatPacket, FragmentType, PacketType } from "@/types/global";
 import { Mutex } from "@/utils/mutex";
@@ -64,11 +70,31 @@ export function usePacketService() {
   );
   const { member, saveMember } = useCredentials();
   const { sendAmigoPathUpdate } = useMessageSender();
+  const syncManager = getGossipSyncManager();
   const mutex = new Mutex();
 
   // Set up queue processor
   useEffect(() => {
     packetQueue.setProcessor(processPacket);
+
+    // Set up the delegate to send packets via BLE
+    const delegate: GossipSyncDelegate = {
+      broadcastPacket: (packet) => {
+        const binary = PacketProtocolService.encode(packet);
+        if (binary) {
+          BleModule.broadcastPacketAsync(binary, []);
+        }
+      },
+      sendPacketToDevice: (deviceUUID, packet) => {
+        const binary = PacketProtocolService.encode(packet);
+        if (binary) {
+          BleModule.directBroadcastPacketAsync(binary, deviceUUID);
+        }
+      },
+    };
+
+    syncManager.setDelegate(delegate);
+    syncManager.start();
   });
 
   /**
@@ -92,11 +118,13 @@ export function usePacketService() {
 
     if (!decodedPacket) throw new Error("Failed to deserialize packet bytes");
 
+    syncManager.onPacketReceived(decodedPacket);
+
     // Store immediately
     incomingPacketsRepository.create(decodedPacket);
 
     // Queue for async processing
-    packetQueue.enqueue(decodedPacket);
+    packetQueue.enqueue(decodedPacket, deviceUUID);
 
     // add to relay repository, packets are always added to the relay repository and re-broadcast
     // this prevents an observer from determining that a packet arrived at its intended recipient
@@ -122,8 +150,9 @@ export function usePacketService() {
    * table to be forwarded on the mesh network.
    *
    * @param packet A raw packet of bytes received over the mesh network
+   * @param deviceUUID The bluetooth identifier of the device that sent the packet
    */
-  const processPacket = async (packet: BitchatPacket) => {
+  const processPacket = async (packet: BitchatPacket, deviceUUID: string) => {
     // if no member state, do nothing
     if (!member) return;
 
@@ -162,6 +191,10 @@ export function usePacketService() {
 
       case PacketType.ANNOUNCE:
         await handleAnnounce(packet.payload);
+        break;
+
+      case PacketType.SYNC_REQUEST:
+        syncManager.handleSyncRequest(deviceUUID, packet);
         break;
 
       default:

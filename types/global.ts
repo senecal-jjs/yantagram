@@ -18,6 +18,7 @@ enum PacketType {
   MESSAGE, // Public chat message
   LEAVE, // "I'm leaving"
   SYNC, // a sync message between peers, should not be relayed
+  SYNC_REQUEST, // request a sync from another peer
 
   FRAGMENT, // Single fragment type for large messages
   FILE_TRANSFER, // Binary file/audio/image payloads

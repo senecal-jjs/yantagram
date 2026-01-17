@@ -1,5 +1,5 @@
 import { Tabs } from "expo-router";
-import React from "react";
+import React, { useEffect } from "react";
 
 import { HapticTab } from "@/components/haptic-tab";
 import { IconSymbol } from "@/components/ui/icon-symbol";
@@ -12,6 +12,11 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 import { usePacketService } from "@/hooks/use-packet-service";
 import BleModule from "@/modules/ble";
 import ConnectedDevicesRepository from "@/repos/specs/connected-devices-repository";
+import {
+  getGossipSyncManager,
+  GossipSyncDelegate,
+} from "@/services/gossip-sync-manager";
+import * as PacketProtocolService from "@/services/packet-protocol-service";
 import { useEventListener } from "expo";
 
 export default function TabLayout() {
@@ -22,6 +27,29 @@ export default function TabLayout() {
   const connectedDevicesRepo = getRepo<ConnectedDevicesRepository>(
     ConnectedDevicesRepositoryToken,
   );
+  const syncManager = getGossipSyncManager();
+
+  // Set up queue processor
+  useEffect(() => {
+    // Set up the delegate to send packets via BLE
+    const delegate: GossipSyncDelegate = {
+      broadcastPacket: (packet) => {
+        const binary = PacketProtocolService.encode(packet);
+        if (binary) {
+          BleModule.broadcastPacketAsync(binary, []);
+        }
+      },
+      sendPacketToDevice: (deviceUUID, packet) => {
+        const binary = PacketProtocolService.encode(packet);
+        if (binary) {
+          BleModule.directBroadcastPacketAsync(binary, deviceUUID);
+        }
+      },
+    };
+
+    syncManager.setDelegate(delegate);
+    syncManager.start();
+  });
 
   useEventListener(BleModule, "onPeripheralReceivedWrite", (message) => {
     console.log("onPeripheralReceivedWrite: ", message.deviceUUID);
@@ -65,6 +93,7 @@ export default function TabLayout() {
       connection.rssi ?? null,
       true,
     );
+    syncManager.scheduleInitialSyncToDevice(connection.deviceUUID, 1000);
   });
 
   useEventListener(BleModule, "onCentralUnsubscription", (connection) => {

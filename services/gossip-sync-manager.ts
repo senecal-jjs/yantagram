@@ -1,5 +1,6 @@
 import BloomFilter, { ExportedBloomFilter } from "@/bloom/bloom-filter";
 import { BitchatPacket, PacketType } from "@/types/global";
+import * as PacketProtocolService from "./packet-protocol-service";
 
 /**
  * Sync type flags for REQUEST_SYNC packets
@@ -8,30 +9,31 @@ export enum SyncTypeFlags {
   ANNOUNCE = 1 << 0,
   MESSAGE = 1 << 1,
   FRAGMENT = 1 << 2,
+  FILE_TRANSFER = 1 << 3,
 }
 
 /**
  * Configuration for the GossipSyncManager
  */
 export interface GossipSyncConfig {
-  /** Maximum packets to store per type */
+  /** Maximum packets to store for messages */
   seenCapacity: number;
   /** Maximum capacity for fragments */
   fragmentCapacity: number;
+  /** Maximum capacity for file transfers */
+  fileTransferCapacity: number;
   /** Bloom filter error rate (false positive rate) */
   bloomFilterErrorRate: number;
   /** Maximum age for messages in milliseconds */
   maxMessageAgeMs: number;
   /** Maintenance interval in milliseconds */
   maintenanceIntervalMs: number;
-  /** Stale peer cleanup interval in milliseconds */
-  stalePeerCleanupIntervalMs: number;
-  /** Stale peer timeout in milliseconds */
-  stalePeerTimeoutMs: number;
   /** Sync interval for messages in milliseconds */
   messageSyncIntervalMs: number;
   /** Sync interval for fragments in milliseconds */
   fragmentSyncIntervalMs: number;
+  /** Sync interval for file transfers in milliseconds */
+  fileTransferSyncIntervalMs: number;
 }
 
 /**
@@ -40,25 +42,31 @@ export interface GossipSyncConfig {
 export const DEFAULT_GOSSIP_SYNC_CONFIG: GossipSyncConfig = {
   seenCapacity: 1000,
   fragmentCapacity: 600,
+  fileTransferCapacity: 200,
   bloomFilterErrorRate: 0.01,
   maxMessageAgeMs: 15 * 60 * 1000, // 15 minutes
   maintenanceIntervalMs: 30 * 1000, // 30 seconds
-  stalePeerCleanupIntervalMs: 60 * 1000, // 60 seconds
-  stalePeerTimeoutMs: 60 * 1000, // 60 seconds
   messageSyncIntervalMs: 15 * 1000, // 15 seconds
   fragmentSyncIntervalMs: 30 * 1000, // 30 seconds
+  fileTransferSyncIntervalMs: 60 * 1000, // 60 seconds
 };
+
+/**
+ * Request sync packet payload structure
+ */
+export interface RequestSyncPayload {
+  types: SyncTypeFlags;
+  bloomFilter: ExportedBloomFilter;
+}
 
 /**
  * Delegate interface for sending packets
  */
 export interface GossipSyncDelegate {
-  /** Send a packet to all connected peers */
-  sendPacket(packet: BitchatPacket): void;
-  /** Send a packet to a specific peer */
-  sendPacketToPeer(peerId: string, packet: BitchatPacket): void;
-  /** Sign a packet for broadcast */
-  signPacketForBroadcast(packet: BitchatPacket): BitchatPacket;
+  /** Broadcast a packet to all connected devices */
+  broadcastPacket(packet: BitchatPacket): void;
+  /** Send a packet to a specific device by UUID */
+  sendPacketToDevice(deviceUUID: string, packet: BitchatPacket): void;
 }
 
 /**
@@ -93,6 +101,20 @@ class PacketStore {
   }
 
   /**
+   * Get a packet by ID
+   */
+  get(idHex: string): BitchatPacket | undefined {
+    return this.packets.get(idHex);
+  }
+
+  /**
+   * Check if a packet exists
+   */
+  has(idHex: string): boolean {
+    return this.packets.has(idHex);
+  }
+
+  /**
    * Get all packets that pass the freshness check
    */
   allPackets(isFresh: (packet: BitchatPacket) => boolean): BitchatPacket[] {
@@ -100,7 +122,7 @@ class PacketStore {
       .map((key) => this.packets.get(key))
       .filter(
         (packet): packet is BitchatPacket =>
-          packet !== undefined && isFresh(packet)
+          packet !== undefined && isFresh(packet),
       );
   }
 
@@ -140,6 +162,14 @@ class PacketStore {
   get size(): number {
     return this.packets.size;
   }
+
+  /**
+   * Clear all packets
+   */
+  clear(): void {
+    this.packets.clear();
+    this.order = [];
+  }
 }
 
 /**
@@ -152,46 +182,36 @@ interface SyncSchedule {
 }
 
 /**
- * Request sync packet payload structure
- */
-export interface RequestSyncPayload {
-  types: SyncTypeFlags;
-  bloomFilter: ExportedBloomFilter;
-}
-
-/**
  * Gossip-based sync manager using Bloom filters for set reconciliation.
  *
- * This manager handles synchronization of packets between peers in a mesh network.
- * It uses Bloom filters to efficiently communicate which packets a peer has,
- * allowing other peers to send only the packets that are missing.
+ * This manager handles synchronization of packets between devices in a mesh network.
+ * It uses Bloom filters to efficiently communicate which packets a device has,
+ * allowing other devices to send only the packets that are missing.
  *
  * Key features:
- * - Periodic broadcast of REQUEST_SYNC packets with Bloom filter of known packets
+ * - Periodic broadcast of SYNC_REQUEST packets with Bloom filter of known packets
  * - Response to sync requests by sending packets not in the requester's filter
- * - Automatic cleanup of expired packets and stale peer announcements
- * - Support for MESSAGE, FRAGMENT, and ANNOUNCE packet types
+ * - Automatic cleanup of expired packets
+ * - Support for MESSAGE, FRAGMENT, ANNOUNCE, and FILE_TRANSFER packet types
+ *
+ * Note: This implementation has no concept of peer IDs. Devices are identified
+ * only by their BLE device UUID for direct packet transmission.
  */
 export class GossipSyncManager {
-  private readonly myPeerId: string;
   private readonly config: GossipSyncConfig;
   private delegate: GossipSyncDelegate | null = null;
 
   // Packet stores by type
   private messages = new PacketStore();
   private fragments = new PacketStore();
-  private latestAnnouncementByPeer: Map<
-    string,
-    { id: string; packet: BitchatPacket }
-  > = new Map();
+  private fileTransfers = new PacketStore();
+  private announcements = new PacketStore();
 
   // Timers
   private maintenanceTimer: ReturnType<typeof setInterval> | null = null;
-  private lastStalePeerCleanup: number = 0;
   private syncSchedules: SyncSchedule[] = [];
 
-  constructor(myPeerId: string, config: Partial<GossipSyncConfig> = {}) {
-    this.myPeerId = myPeerId;
+  constructor(config: Partial<GossipSyncConfig> = {}) {
     this.config = { ...DEFAULT_GOSSIP_SYNC_CONFIG, ...config };
 
     // Initialize sync schedules
@@ -212,6 +232,16 @@ export class GossipSyncManager {
         lastSent: 0,
       });
     }
+    if (
+      this.config.fileTransferCapacity > 0 &&
+      this.config.fileTransferSyncIntervalMs > 0
+    ) {
+      this.syncSchedules.push({
+        types: SyncTypeFlags.FILE_TRANSFER,
+        intervalMs: this.config.fileTransferSyncIntervalMs,
+        lastSent: 0,
+      });
+    }
   }
 
   /**
@@ -227,9 +257,19 @@ export class GossipSyncManager {
   start(): void {
     this.stop();
 
+    console.log(
+      "[GossipSync] Starting sync manager with config:",
+      JSON.stringify({
+        seenCapacity: this.config.seenCapacity,
+        fragmentCapacity: this.config.fragmentCapacity,
+        fileTransferCapacity: this.config.fileTransferCapacity,
+        maintenanceIntervalMs: this.config.maintenanceIntervalMs,
+      }),
+    );
+
     this.maintenanceTimer = setInterval(
       () => this.performPeriodicMaintenance(),
-      this.config.maintenanceIntervalMs
+      this.config.maintenanceIntervalMs,
     );
   }
 
@@ -238,113 +278,211 @@ export class GossipSyncManager {
    */
   stop(): void {
     if (this.maintenanceTimer) {
+      console.log("[GossipSync] Stopping sync manager");
       clearInterval(this.maintenanceTimer);
       this.maintenanceTimer = null;
     }
   }
 
   /**
-   * Schedule an initial sync to a newly connected peer
+   * Schedule an initial sync to a newly connected device
+   * @param deviceUUID - The BLE device UUID to sync with
+   * @param delayMs - Delay before sending the sync request
    */
-  scheduleInitialSyncToPeer(peerId: string, delayMs: number = 5000): void {
+  scheduleInitialSyncToDevice(
+    deviceUUID: string,
+    delayMs: number = 5000,
+  ): void {
+    console.log(
+      `[GossipSync] Scheduling initial sync to device ${deviceUUID} in ${delayMs}ms`,
+    );
     setTimeout(() => {
-      this.sendRequestSyncToPeer(peerId, SyncTypeFlags.MESSAGE);
+      this.sendRequestSyncToDevice(deviceUUID, SyncTypeFlags.MESSAGE);
 
       if (
         this.config.fragmentCapacity > 0 &&
         this.config.fragmentSyncIntervalMs > 0
       ) {
         setTimeout(() => {
-          this.sendRequestSyncToPeer(peerId, SyncTypeFlags.FRAGMENT);
+          this.sendRequestSyncToDevice(deviceUUID, SyncTypeFlags.FRAGMENT);
         }, 500);
+      }
+
+      if (
+        this.config.fileTransferCapacity > 0 &&
+        this.config.fileTransferSyncIntervalMs > 0
+      ) {
+        setTimeout(() => {
+          this.sendRequestSyncToDevice(deviceUUID, SyncTypeFlags.FILE_TRANSFER);
+        }, 1000);
       }
     }, delayMs);
   }
 
   /**
-   * Called when a public packet is received
+   * Called when a packet is received. Tracks the packet for sync purposes.
+   * @param packet - The received packet
    */
-  onPublicPacketSeen(packet: BitchatPacket): void {
-    const isBroadcast = this.isBroadcastPacket(packet);
+  onPacketReceived(packet: BitchatPacket): void {
+    // Skip if packet is too old
+    if (!this.isPacketFresh(packet)) {
+      console.log(
+        `[GossipSync] Ignoring stale packet type=${packet.type} timestamp=${packet.timestamp}`,
+      );
+      return;
+    }
+
+    const idHex = this.computePacketId(packet);
+    console.log(
+      `[GossipSync] Tracking packet type=${packet.type} id=${idHex.slice(0, 16)}...`,
+    );
 
     switch (packet.type) {
       case PacketType.ANNOUNCE:
-        if (!this.isPacketFresh(packet)) return;
-        if (!this.isAnnouncementFresh(packet)) {
-          const senderId = this.extractSenderId(packet);
-          if (senderId) {
-            this.removeStateForPeer(senderId);
-          }
-          return;
-        }
-        this.handleAnnouncement(packet);
+        this.announcements.insert(
+          idHex,
+          packet,
+          Math.max(100, this.config.seenCapacity / 10),
+        );
         break;
 
       case PacketType.MESSAGE:
-        if (!isBroadcast) return;
-        if (!this.isPacketFresh(packet)) return;
-        this.handleMessage(packet);
+        this.messages.insert(idHex, packet, this.config.seenCapacity);
         break;
 
       case PacketType.FRAGMENT:
-        if (!isBroadcast) return;
-        if (!this.isPacketFresh(packet)) return;
-        this.handleFragment(packet);
+        this.fragments.insert(idHex, packet, this.config.fragmentCapacity);
         break;
 
-      case PacketType.SYNC:
-        // Handle incoming sync request
-        this.handleSyncRequest(packet);
+      case PacketType.FILE_TRANSFER:
+        this.fileTransfers.insert(
+          idHex,
+          packet,
+          this.config.fileTransferCapacity,
+        );
+        break;
+
+      case PacketType.SYNC_REQUEST:
+        // SYNC_REQUEST packets are handled separately via handleSyncRequest
+        break;
+
+      default:
+        // Other packet types are not tracked for sync
         break;
     }
   }
 
   /**
-   * Handle a REQUEST_SYNC packet from a peer
+   * Handle a SYNC_REQUEST packet from another device
+   * @param fromDeviceUUID - The BLE device UUID that sent the request
+   * @param packet - The sync request packet
    */
-  handleRequestSync(fromPeerId: string, payload: RequestSyncPayload): void {
-    const requestedTypes = payload.types;
-    const theirFilter = BloomFilter.fromJSON(payload.bloomFilter);
+  handleSyncRequest(fromDeviceUUID: string, packet: BitchatPacket): void {
+    console.log(
+      `[GossipSync] Received SYNC_REQUEST from device ${fromDeviceUUID}`,
+    );
+    try {
+      const payload = this.decodeRequestSyncPayload(packet.payload);
+      if (!payload) {
+        console.error("[GossipSync] Failed to decode sync request payload");
+        return;
+      }
 
-    // Send packets they don't have
+      console.log(
+        `[GossipSync] Sync request types=${payload.types} (${this.syncTypesToString(payload.types)})`,
+      );
+      this.respondToSyncRequest(fromDeviceUUID, payload);
+    } catch (error) {
+      console.error("[GossipSync] Failed to handle sync request:", error);
+    }
+  }
+
+  /**
+   * Respond to a sync request by sending packets the requester doesn't have
+   */
+  private respondToSyncRequest(
+    deviceUUID: string,
+    request: RequestSyncPayload,
+  ): void {
+    const requestedTypes = request.types;
+    const theirFilter = BloomFilter.fromJSON(request.bloomFilter);
+    let sentCount = 0;
+
+    // Send announcements they don't have
     if (requestedTypes & SyncTypeFlags.ANNOUNCE) {
-      for (const [, { packet }] of this.latestAnnouncementByPeer) {
-        if (!this.isPacketFresh(packet)) continue;
+      for (const packet of this.announcements.allPackets((p) =>
+        this.isPacketFresh(p),
+      )) {
         const idHex = this.computePacketId(packet);
         if (!theirFilter.has(idHex)) {
-          this.sendPacketToPeer(fromPeerId, { ...packet, allowedHops: 0 });
+          this.sendPacketToDevice(deviceUUID, { ...packet, allowedHops: 0 });
+          sentCount++;
         }
       }
     }
 
+    // Send messages they don't have
     if (requestedTypes & SyncTypeFlags.MESSAGE) {
       for (const packet of this.messages.allPackets((p) =>
-        this.isPacketFresh(p)
+        this.isPacketFresh(p),
       )) {
         const idHex = this.computePacketId(packet);
         if (!theirFilter.has(idHex)) {
-          this.sendPacketToPeer(fromPeerId, { ...packet, allowedHops: 0 });
+          this.sendPacketToDevice(deviceUUID, { ...packet, allowedHops: 0 });
+          sentCount++;
         }
       }
     }
 
+    // Send fragments they don't have
     if (requestedTypes & SyncTypeFlags.FRAGMENT) {
       for (const packet of this.fragments.allPackets((p) =>
-        this.isPacketFresh(p)
+        this.isPacketFresh(p),
       )) {
         const idHex = this.computePacketId(packet);
         if (!theirFilter.has(idHex)) {
-          this.sendPacketToPeer(fromPeerId, { ...packet, allowedHops: 0 });
+          this.sendPacketToDevice(deviceUUID, { ...packet, allowedHops: 0 });
+          sentCount++;
         }
       }
     }
+
+    // Send file transfers they don't have
+    if (requestedTypes & SyncTypeFlags.FILE_TRANSFER) {
+      for (const packet of this.fileTransfers.allPackets((p) =>
+        this.isPacketFresh(p),
+      )) {
+        const idHex = this.computePacketId(packet);
+        if (!theirFilter.has(idHex)) {
+          this.sendPacketToDevice(deviceUUID, { ...packet, allowedHops: 0 });
+          sentCount++;
+        }
+      }
+    }
+
+    console.log(
+      `[GossipSync] Sent ${sentCount} missing packets to device ${deviceUUID}`,
+    );
   }
 
   /**
-   * Remove announcement for a specific peer (e.g., when they leave)
+   * Check if we already have a packet (for deduplication)
    */
-  removeAnnouncementForPeer(peerId: string): void {
-    this.removeStateForPeer(peerId);
+  hasPacket(packet: BitchatPacket): boolean {
+    const idHex = this.computePacketId(packet);
+
+    switch (packet.type) {
+      case PacketType.ANNOUNCE:
+        return this.announcements.has(idHex);
+      case PacketType.MESSAGE:
+        return this.messages.has(idHex);
+      case PacketType.FRAGMENT:
+        return this.fragments.has(idHex);
+      case PacketType.FILE_TRANSFER:
+        return this.fileTransfers.has(idHex);
+      default:
+        return false;
+    }
   }
 
   /**
@@ -353,88 +491,84 @@ export class GossipSyncManager {
   getStats(): {
     messageCount: number;
     fragmentCount: number;
+    fileTransferCount: number;
     announcementCount: number;
   } {
     return {
       messageCount: this.messages.size,
       fragmentCount: this.fragments.size,
-      announcementCount: this.latestAnnouncementByPeer.size,
+      fileTransferCount: this.fileTransfers.size,
+      announcementCount: this.announcements.size,
     };
+  }
+
+  /**
+   * Clear all stored packets
+   */
+  clear(): void {
+    this.messages.clear();
+    this.fragments.clear();
+    this.fileTransfers.clear();
+    this.announcements.clear();
   }
 
   // ============ Private Methods ============
 
-  private handleAnnouncement(packet: BitchatPacket): void {
-    const idHex = this.computePacketId(packet);
-    const senderId = this.extractSenderId(packet);
-    if (senderId) {
-      this.latestAnnouncementByPeer.set(senderId, { id: idHex, packet });
-    }
-  }
-
-  private handleMessage(packet: BitchatPacket): void {
-    const idHex = this.computePacketId(packet);
-    this.messages.insert(idHex, packet, this.config.seenCapacity);
-  }
-
-  private handleFragment(packet: BitchatPacket): void {
-    const idHex = this.computePacketId(packet);
-    this.fragments.insert(idHex, packet, this.config.fragmentCapacity);
-  }
-
-  private handleSyncRequest(packet: BitchatPacket): void {
-    try {
-      const payload = this.decodeRequestSyncPayload(packet.payload);
-      const senderId = this.extractSenderId(packet);
-      if (senderId && payload) {
-        this.handleRequestSync(senderId, payload);
-      }
-    } catch (error) {
-      console.error("[GossipSync] Failed to handle sync request:", error);
-    }
-  }
-
-  private sendRequestSync(types: SyncTypeFlags): void {
+  /**
+   * Broadcast a sync request to all connected devices
+   */
+  private sendRequestSyncBroadcast(types: SyncTypeFlags): void {
     const payload = this.buildBloomFilterPayload(types);
     const packet: BitchatPacket = {
       version: 1,
-      type: PacketType.SYNC,
+      type: PacketType.SYNC_REQUEST,
       timestamp: Date.now(),
       payload: this.encodeRequestSyncPayload(payload),
       allowedHops: 0, // Local only, don't relay
     };
 
-    const signed = this.delegate?.signPacketForBroadcast(packet) ?? packet;
-    this.delegate?.sendPacket(signed);
+    console.log(
+      `[GossipSync] Broadcasting SYNC_REQUEST for ${this.syncTypesToString(types)}`,
+    );
+    this.delegate?.broadcastPacket(packet);
   }
 
-  private sendRequestSyncToPeer(peerId: string, types: SyncTypeFlags): void {
+  /**
+   * Send a sync request to a specific device
+   */
+  private sendRequestSyncToDevice(
+    deviceUUID: string,
+    types: SyncTypeFlags,
+  ): void {
     const payload = this.buildBloomFilterPayload(types);
     const packet: BitchatPacket = {
       version: 1,
-      type: PacketType.SYNC,
+      type: PacketType.SYNC_REQUEST,
       timestamp: Date.now(),
       payload: this.encodeRequestSyncPayload(payload),
       allowedHops: 0, // Local only
     };
 
-    const signed = this.delegate?.signPacketForBroadcast(packet) ?? packet;
-    this.sendPacketToPeer(peerId, signed);
+    console.log(
+      `[GossipSync] Sending SYNC_REQUEST to ${deviceUUID} for ${this.syncTypesToString(types)}`,
+    );
+    this.sendPacketToDevice(deviceUUID, packet);
   }
 
-  private sendPacketToPeer(peerId: string, packet: BitchatPacket): void {
-    this.delegate?.sendPacketToPeer(peerId, packet);
+  private sendPacketToDevice(deviceUUID: string, packet: BitchatPacket): void {
+    this.delegate?.sendPacketToDevice(deviceUUID, packet);
   }
 
+  /**
+   * Build a bloom filter payload containing IDs of packets we have
+   */
   private buildBloomFilterPayload(types: SyncTypeFlags): RequestSyncPayload {
     const packets: BitchatPacket[] = [];
 
     if (types & SyncTypeFlags.ANNOUNCE) {
-      for (const [, { packet }] of this.latestAnnouncementByPeer) {
-        if (this.isPacketFresh(packet)) {
-          packets.push(packet);
-        }
-      }
+      packets.push(
+        ...this.announcements.allPackets((p) => this.isPacketFresh(p)),
+      );
     }
 
     if (types & SyncTypeFlags.MESSAGE) {
@@ -445,14 +579,26 @@ export class GossipSyncManager {
       packets.push(...this.fragments.allPackets((p) => this.isPacketFresh(p)));
     }
 
+    if (types & SyncTypeFlags.FILE_TRANSFER) {
+      packets.push(
+        ...this.fileTransfers.allPackets((p) => this.isPacketFresh(p)),
+      );
+    }
+
     // Sort by timestamp descending (newest first)
     packets.sort((a, b) => b.timestamp - a.timestamp);
 
+    // Determine capacity based on type
+    let capacity: number;
+    if (types === SyncTypeFlags.FRAGMENT) {
+      capacity = this.config.fragmentCapacity;
+    } else if (types === SyncTypeFlags.FILE_TRANSFER) {
+      capacity = this.config.fileTransferCapacity;
+    } else {
+      capacity = this.config.seenCapacity;
+    }
+
     // Limit to capacity
-    const capacity =
-      types === SyncTypeFlags.FRAGMENT
-        ? this.config.fragmentCapacity
-        : this.config.seenCapacity;
     const limitedPackets = packets.slice(0, capacity);
 
     // Build bloom filter from packet IDs
@@ -460,7 +606,7 @@ export class GossipSyncManager {
       limitedPackets.length > 0
         ? BloomFilter.create(
             Math.max(limitedPackets.length, 10),
-            this.config.bloomFilterErrorRate
+            this.config.bloomFilterErrorRate,
           )
         : BloomFilter.create(10, this.config.bloomFilterErrorRate);
 
@@ -475,14 +621,19 @@ export class GossipSyncManager {
     };
   }
 
+  /**
+   * Periodic maintenance: cleanup expired packets and send sync requests
+   */
   private performPeriodicMaintenance(): void {
     const now = Date.now();
+    const stats = this.getStats();
 
-    // Cleanup expired messages
-    this.cleanupExpiredMessages();
+    console.log(
+      `[GossipSync] Maintenance: messages=${stats.messageCount} fragments=${stats.fragmentCount} files=${stats.fileTransferCount} announces=${stats.announcementCount}`,
+    );
 
-    // Cleanup stale announcements
-    this.cleanupStaleAnnouncementsIfNeeded(now);
+    // Cleanup expired packets
+    this.cleanupExpiredPackets();
 
     // Send scheduled sync requests
     for (const schedule of this.syncSchedules) {
@@ -492,56 +643,24 @@ export class GossipSyncManager {
         now - schedule.lastSent >= schedule.intervalMs
       ) {
         schedule.lastSent = now;
-        this.sendRequestSync(schedule.types);
+        this.sendRequestSyncBroadcast(schedule.types);
       }
     }
   }
 
-  private cleanupExpiredMessages(): void {
-    // Remove expired announcements
-    for (const [peerId, { packet }] of this.latestAnnouncementByPeer) {
-      if (!this.isPacketFresh(packet)) {
-        this.latestAnnouncementByPeer.delete(peerId);
-      }
-    }
-
-    // Remove expired messages and fragments
+  /**
+   * Remove expired packets from all stores
+   */
+  private cleanupExpiredPackets(): void {
+    this.announcements.removeExpired((p) => this.isPacketFresh(p));
     this.messages.removeExpired((p) => this.isPacketFresh(p));
     this.fragments.removeExpired((p) => this.isPacketFresh(p));
+    this.fileTransfers.removeExpired((p) => this.isPacketFresh(p));
   }
 
-  private cleanupStaleAnnouncementsIfNeeded(now: number): void {
-    if (
-      now - this.lastStalePeerCleanup <
-      this.config.stalePeerCleanupIntervalMs
-    ) {
-      return;
-    }
-    this.lastStalePeerCleanup = now;
-    this.cleanupStaleAnnouncements(now);
-  }
-
-  private cleanupStaleAnnouncements(now: number): void {
-    const cutoff = now - this.config.stalePeerTimeoutMs;
-    const stalePeerIds: string[] = [];
-
-    for (const [peerId, { packet }] of this.latestAnnouncementByPeer) {
-      if (packet.timestamp < cutoff) {
-        stalePeerIds.push(peerId);
-      }
-    }
-
-    for (const peerId of stalePeerIds) {
-      this.removeStateForPeer(peerId);
-    }
-  }
-
-  private removeStateForPeer(peerId: string): void {
-    this.latestAnnouncementByPeer.delete(peerId);
-    this.messages.remove((packet) => this.extractSenderId(packet) === peerId);
-    this.fragments.remove((packet) => this.extractSenderId(packet) === peerId);
-  }
-
+  /**
+   * Check if a packet is within the age threshold
+   */
   private isPacketFresh(packet: BitchatPacket): boolean {
     const now = Date.now();
     if (now < this.config.maxMessageAgeMs) return true;
@@ -549,61 +668,33 @@ export class GossipSyncManager {
     return packet.timestamp >= cutoff;
   }
 
-  private isAnnouncementFresh(packet: BitchatPacket): boolean {
-    if (this.config.stalePeerTimeoutMs <= 0) return true;
-    const now = Date.now();
-    if (now < this.config.stalePeerTimeoutMs) return true;
-    const cutoff = now - this.config.stalePeerTimeoutMs;
-    return packet.timestamp >= cutoff;
-  }
-
-  private isBroadcastPacket(_packet: BitchatPacket): boolean {
-    // In this simplified implementation, we consider all packets as broadcasts
-    // The original Swift code checks if recipientID is null or all 0xFF bytes
-    return true;
-  }
-
-  private extractSenderId(packet: BitchatPacket): string | null {
-    // Extract sender ID from packet payload
-    // This is a simplified implementation - actual extraction depends on payload format
-    // For now, we'll use a hash of the packet as a pseudo-sender ID
-    return this.computePacketId(packet).slice(0, 16);
-  }
-
+  /**
+   * Compute a unique ID for a packet by encoding it to binary and converting to hex
+   */
   private computePacketId(packet: BitchatPacket): string {
-    // Compute a unique ID for the packet based on its contents
-    // Using timestamp + type + first bytes of payload as a simple hash
-    const data = new Uint8Array(16);
-    const view = new DataView(data.buffer);
-
-    // Write timestamp (8 bytes)
-    const timestamp = BigInt(packet.timestamp);
-    view.setBigUint64(0, timestamp, false);
-
-    // Write type (1 byte)
-    data[8] = packet.type;
-
-    // Write version (1 byte)
-    data[9] = packet.version;
-
-    // Write first 6 bytes of payload
-    for (let i = 0; i < 6 && i < packet.payload.length; i++) {
-      data[10 + i] = packet.payload[i];
+    const binary = PacketProtocolService.encode(packet, false);
+    if (!binary) {
+      // Fallback: use timestamp + type as minimal ID
+      return `${packet.timestamp.toString(16)}-${packet.type.toString(16)}`;
     }
-
-    // Convert to hex string
-    return Array.from(data)
+    return Array.from(binary)
       .map((b) => b.toString(16).padStart(2, "0"))
       .join("");
   }
 
+  /**
+   * Encode a sync request payload to binary
+   */
   private encodeRequestSyncPayload(payload: RequestSyncPayload): Uint8Array {
     const json = JSON.stringify(payload);
     return new TextEncoder().encode(json);
   }
 
+  /**
+   * Decode a sync request payload from binary
+   */
   private decodeRequestSyncPayload(
-    data: Uint8Array
+    data: Uint8Array,
   ): RequestSyncPayload | null {
     try {
       const json = new TextDecoder().decode(data);
@@ -612,28 +703,39 @@ export class GossipSyncManager {
       return null;
     }
   }
+
+  /**
+   * Convert sync type flags to a readable string
+   */
+  private syncTypesToString(types: SyncTypeFlags): string {
+    const parts: string[] = [];
+    if (types & SyncTypeFlags.ANNOUNCE) parts.push("ANNOUNCE");
+    if (types & SyncTypeFlags.MESSAGE) parts.push("MESSAGE");
+    if (types & SyncTypeFlags.FRAGMENT) parts.push("FRAGMENT");
+    if (types & SyncTypeFlags.FILE_TRANSFER) parts.push("FILE_TRANSFER");
+    return parts.join("|") || "NONE";
+  }
 }
 
-/**
- * Create a singleton instance of GossipSyncManager
- */
+// ============ Singleton Instance ============
+
 let instance: GossipSyncManager | null = null;
 
+/**
+ * Get or create the GossipSyncManager singleton
+ */
 export function getGossipSyncManager(
-  myPeerId?: string,
-  config?: Partial<GossipSyncConfig>
+  config?: Partial<GossipSyncConfig>,
 ): GossipSyncManager {
-  if (!instance && myPeerId) {
-    instance = new GossipSyncManager(myPeerId, config);
-  }
   if (!instance) {
-    throw new Error(
-      "GossipSyncManager not initialized. Provide myPeerId on first call."
-    );
+    instance = new GossipSyncManager(config);
   }
   return instance;
 }
 
+/**
+ * Reset the GossipSyncManager singleton
+ */
 export function resetGossipSyncManager(): void {
   if (instance) {
     instance.stop();
