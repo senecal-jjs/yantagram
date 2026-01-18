@@ -31,6 +31,14 @@ export default function TabLayout() {
 
   // Set up queue processor and periodic cleanup
   useEffect(() => {
+    // Clear stale connected devices from previous sessions on app start
+    // The native BLE module starts fresh, so any persisted "connected" devices are stale
+    connectedDevicesRepo.deleteAll().then(() => {
+      console.log(
+        "[DeviceCleanup] Cleared stale devices from previous session",
+      );
+    });
+
     // Set up the delegate to send packets via BLE
     const delegate: GossipSyncDelegate = {
       broadcastPacket: (packet) => {
@@ -50,8 +58,8 @@ export default function TabLayout() {
     syncManager.setDelegate(delegate);
     syncManager.start();
 
-    // Periodically clean up stale connected devices (not seen in 30 minutes)
-    const STALE_DEVICE_THRESHOLD_MS = 30 * 60 * 1000; // 30 minutes
+    // Periodically clean up stale connected devices (not seen in 1 minute)
+    const STALE_DEVICE_THRESHOLD_MS = 1 * 60 * 1000; // 1 minute
     const cleanupInterval = setInterval(async () => {
       const deleted = await connectedDevicesRepo.deleteStale(
         STALE_DEVICE_THRESHOLD_MS,
@@ -64,7 +72,7 @@ export default function TabLayout() {
     return () => {
       clearInterval(cleanupInterval);
     };
-  });
+  }, []);
 
   useEventListener(BleModule, "onPeripheralReceivedWrite", (message) => {
     console.log("onPeripheralReceivedWrite: ", message.deviceUUID);
