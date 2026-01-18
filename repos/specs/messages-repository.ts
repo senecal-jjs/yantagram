@@ -1,4 +1,4 @@
-import { Message, MessageWithPseudonym } from "@/types/global";
+import { DeliveryStatus, Message, MessageWithPseudonym } from "@/types/global";
 import { UUID } from "@/types/utility";
 
 /**
@@ -12,19 +12,20 @@ export default interface MessagesRepository {
     groupId: string,
     sender: string,
     contents: string,
-    timestamp: number,
+    timestamp: number
   ): Promise<Message>;
   get(id: UUID): Promise<Message>;
   getAll(limit: number): Promise<Message[]>;
   getByGroupId(
     groupId: string,
     limit: number,
-    offset?: number,
+    offset?: number
   ): Promise<MessageWithPseudonym[]>;
   exists(id: UUID): Promise<boolean>;
   markGroupAsRead(groupId: UUID, notifyListener: boolean): Promise<void>;
   markAsRead(id: UUID, notifyListener: boolean): Promise<void>;
   hasUnreadInGroup(groupId: UUID): Promise<boolean>;
+  updateDeliveryStatus(id: string, status: DeliveryStatus): Promise<void>;
   deleteOlderThan(timestampMs: number): Promise<number>;
   deleteAll(): Promise<void>;
 }

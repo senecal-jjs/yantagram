@@ -1,4 +1,4 @@
-import { Message, MessageWithPseudonym } from "@/types/global";
+import { DeliveryStatus, Message, MessageWithPseudonym } from "@/types/global";
 import { UUID } from "@/types/utility";
 import * as SQLite from "expo-sqlite";
 import { dbListener } from "../db-listener";
@@ -27,7 +27,7 @@ class SQMessagesRepository implements MessagesRepository, Repository {
 
   async deleteOlderThan(timestampMs: number): Promise<number> {
     const statement = await this.db.prepareAsync(
-      "DELETE FROM messages WHERE timestamp < $timestamp",
+      "DELETE FROM messages WHERE timestamp < $timestamp"
     );
 
     try {
@@ -51,10 +51,10 @@ class SQMessagesRepository implements MessagesRepository, Repository {
     groupId: string,
     sender: string,
     contents: string,
-    timestamp: number,
+    timestamp: number
   ): Promise<Message> {
     const statement = await this.db.prepareAsync(
-      "INSERT INTO messages (id, sender, contents, timestamp, group_id) VALUES ($id, $sender, $contents, $timestamp, $groupId)",
+      "INSERT INTO messages (id, sender, contents, timestamp, group_id) VALUES ($id, $sender, $contents, $timestamp, $groupId)"
     );
 
     try {
@@ -76,7 +76,7 @@ class SQMessagesRepository implements MessagesRepository, Repository {
 
   async get(id: UUID): Promise<Message> {
     const statement = await this.db.prepareAsync(
-      "SELECT * FROM messages WHERE id = $id LIMIT 1",
+      "SELECT * FROM messages WHERE id = $id LIMIT 1"
     );
 
     try {
@@ -86,6 +86,7 @@ class SQMessagesRepository implements MessagesRepository, Repository {
         contents: string;
         timestamp: number;
         group_id: string;
+        delivery_status: number;
       }>({ $id: id });
 
       const row = await result.getFirstAsync();
@@ -102,7 +103,7 @@ class SQMessagesRepository implements MessagesRepository, Repository {
 
   async getAll(limit: number): Promise<Message[]> {
     const statement = await this.db.prepareAsync(
-      "SELECT * FROM messages ORDER BY timestamp ASC LIMIT $limit",
+      "SELECT * FROM messages ORDER BY timestamp ASC LIMIT $limit"
     );
 
     try {
@@ -112,6 +113,7 @@ class SQMessagesRepository implements MessagesRepository, Repository {
         contents: string;
         timestamp: number;
         group_id: string;
+        delivery_status: number;
       }>({ $limit: limit });
 
       const rows = await result.getAllAsync();
@@ -125,10 +127,10 @@ class SQMessagesRepository implements MessagesRepository, Repository {
   async getByGroupId(
     groupId: string,
     limit: number,
-    offset: number = 0,
+    offset: number = 0
   ): Promise<MessageWithPseudonym[]> {
     const statement = await this.db.prepareAsync(
-      "SELECT messages.*, contacts.pseudonym FROM messages LEFT JOIN contacts ON messages.sender = contacts.verification_key WHERE messages.group_id = $groupId ORDER BY messages.timestamp DESC LIMIT $limit OFFSET $offset",
+      "SELECT messages.*, contacts.pseudonym FROM messages LEFT JOIN contacts ON messages.sender = contacts.verification_key WHERE messages.group_id = $groupId ORDER BY messages.timestamp DESC LIMIT $limit OFFSET $offset"
     );
 
     try {
@@ -138,6 +140,7 @@ class SQMessagesRepository implements MessagesRepository, Repository {
         contents: string;
         timestamp: number;
         group_id: string;
+        delivery_status: number;
         pseudonym: string | null;
       }>({ $groupId: groupId, $limit: limit, $offset: offset });
 
@@ -155,7 +158,7 @@ class SQMessagesRepository implements MessagesRepository, Repository {
 
   async exists(id: UUID): Promise<boolean> {
     const statement = await this.db.prepareAsync(
-      "SELECT COUNT(*) as count FROM messages WHERE id = $id",
+      "SELECT COUNT(*) as count FROM messages WHERE id = $id"
     );
 
     try {
@@ -173,7 +176,7 @@ class SQMessagesRepository implements MessagesRepository, Repository {
 
   async markAsRead(id: UUID, notifyListener: boolean): Promise<void> {
     const statement = await this.db.prepareAsync(
-      "UPDATE messages SET was_read = 1 WHERE id = $id",
+      "UPDATE messages SET was_read = 1 WHERE id = $id"
     );
 
     try {
@@ -188,7 +191,7 @@ class SQMessagesRepository implements MessagesRepository, Repository {
 
   async markGroupAsRead(groupId: UUID, notifyListener: boolean): Promise<void> {
     const statement = await this.db.prepareAsync(
-      "UPDATE messages SET was_read = 1 WHERE group_id = $groupId AND was_read = 0",
+      "UPDATE messages SET was_read = 1 WHERE group_id = $groupId AND was_read = 0"
     );
 
     try {
@@ -203,7 +206,7 @@ class SQMessagesRepository implements MessagesRepository, Repository {
 
   async hasUnreadInGroup(groupId: UUID): Promise<boolean> {
     const statement = await this.db.prepareAsync(
-      "SELECT COUNT(*) as count FROM messages WHERE group_id = $groupId AND was_read = 0",
+      "SELECT COUNT(*) as count FROM messages WHERE group_id = $groupId AND was_read = 0"
     );
 
     try {
@@ -219,6 +222,22 @@ class SQMessagesRepository implements MessagesRepository, Repository {
     }
   }
 
+  async updateDeliveryStatus(
+    id: string,
+    status: DeliveryStatus
+  ): Promise<void> {
+    const statement = await this.db.prepareAsync(
+      "UPDATE messages SET delivery_status = $status WHERE id = $id"
+    );
+
+    try {
+      await statement.executeAsync({ $id: id, $status: status });
+    } finally {
+      await statement.finalizeAsync();
+      dbListener.notifyMessageChange();
+    }
+  }
+
   /**
    * Convert database row to Message object
    */
@@ -228,6 +247,7 @@ class SQMessagesRepository implements MessagesRepository, Repository {
     contents: string;
     timestamp: number;
     group_id: string;
+    delivery_status?: number;
   }): Message {
     return {
       id: row.id,
@@ -235,6 +255,7 @@ class SQMessagesRepository implements MessagesRepository, Repository {
       sender: row.sender,
       contents: row.contents,
       timestamp: row.timestamp,
+      deliveryStatus: row.delivery_status as DeliveryStatus | undefined,
     };
   }
 }

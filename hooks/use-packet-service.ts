@@ -31,9 +31,18 @@ import {
 } from "@/services/frag-service";
 import { fromBinaryPayload } from "@/services/message-protocol-service";
 import { packetQueue } from "@/services/packet-processor-queue";
-import { decode } from "@/services/packet-protocol-service";
-import { BitchatPacket, FragmentType, PacketType } from "@/types/global";
+import {
+  decode,
+  deserializeDeliveryAck,
+} from "@/services/packet-protocol-service";
+import {
+  BitchatPacket,
+  DeliveryStatus,
+  FragmentType,
+  PacketType,
+} from "@/types/global";
 import { Mutex } from "@/utils/mutex";
+import { uint8ArrayToHexString } from "@/utils/string";
 import { useEffect } from "react";
 import { useMessageSender } from "./use-message-sender";
 import { useTTLBloomFilter } from "./use-ttl-bloom-filter";
@@ -63,7 +72,7 @@ export function usePacketService() {
     RelayPacketsRepositoryToken,
   );
   const { member, saveMember } = useCredentials();
-  const { sendAmigoPathUpdate } = useMessageSender();
+  const { sendAmigoPathUpdate, sendDeliveryAck } = useMessageSender();
   const mutex = new Mutex();
 
   // Set up queue processor
@@ -162,6 +171,10 @@ export function usePacketService() {
 
       case PacketType.ANNOUNCE:
         await handleAnnounce(packet.payload);
+        break;
+
+      case PacketType.DELIVERY_ACK:
+        await handleDeliveryAck(packet.payload);
         break;
 
       default:
@@ -342,6 +355,14 @@ export function usePacketService() {
             message.contents,
             message.timestamp,
           );
+
+          // Send delivery ACK for messages not sent by ourselves
+          const myVerificationKey = uint8ArrayToHexString(
+            member.credential.verificationKey,
+          );
+          if (message.sender !== myVerificationKey) {
+            sendDeliveryAck(message.id);
+          }
         }
       });
     } else {
@@ -403,6 +424,36 @@ export function usePacketService() {
       }
     } catch (error) {
       console.error("Failed to handle announce packet:", error);
+    }
+  };
+
+  /**
+   * Handle delivery acknowledgement packets.
+   * Updates the delivery status of the original message to DELIVERED.
+   */
+  const handleDeliveryAck = async (ackBytes: Uint8Array) => {
+    try {
+      const ack = deserializeDeliveryAck(ackBytes);
+
+      if (!ack) {
+        console.warn("Failed to deserialize delivery ACK");
+        return;
+      }
+
+      // Check if we have this message (we're the sender)
+      const messageExists = await messagesRepository.exists(ack.messageId);
+
+      if (messageExists) {
+        await messagesRepository.updateDeliveryStatus(
+          ack.messageId,
+          DeliveryStatus.DELIVERED,
+        );
+        console.log(
+          `[DeliveryAck] Message ${ack.messageId} marked as DELIVERED`,
+        );
+      }
+    } catch (error) {
+      console.error("Failed to handle delivery ACK:", error);
     }
   };
 

@@ -1,4 +1,4 @@
-import { Message } from "@/types/global";
+import { DeliveryStatus, Message } from "@/types/global";
 import { StyleSheet, Text, View } from "react-native";
 import { SvgXml } from "react-native-svg";
 
@@ -19,6 +19,21 @@ const curlLeft = `<svg width="17" height="21" viewBox="0 0 17 21" fill="none" xm
 <path d="M0.11315 20.1846C5.31315 20.9846 10.4465 18.1212 12.1132 16.2879C10.3953 12.1914 21.0011 2.24186 14.0011 2.24148C12.3825 2.24148 11 -1.9986 5.11315 1.1846C5.09194 2.47144 5.11315 6.92582 5.11315 7.6842C5.11315 18.1842 -0.88685 19.5813 0.11315 20.1846Z" fill="#545455ff"/>
 </svg>
 `;
+
+/**
+ * Get delivery status indicator text for sent messages
+ */
+const getDeliveryIndicator = (status?: DeliveryStatus): string => {
+  switch (status) {
+    case DeliveryStatus.DELIVERED:
+    case DeliveryStatus.READ:
+      return "\u2713\u2713"; // Double checkmark
+    case DeliveryStatus.SENT:
+    case DeliveryStatus.SENDING:
+    default:
+      return "\u2713"; // Single checkmark
+  }
+};
 
 export const ChatBubble = ({
   message,
@@ -48,6 +63,11 @@ export const ChatBubble = ({
         >
           {message.contents}
         </Text>
+        {message.sender === verificationKey && (
+          <Text style={styles.deliveryIndicator}>
+            {getDeliveryIndicator(message.deliveryStatus)}
+          </Text>
+        )}
       </View>
       {message.sender !== verificationKey ? (
         <SvgXml xml={curlLeft} width={20} height={20} style={styles.curlLeft} />
@@ -107,5 +127,11 @@ const styles = StyleSheet.create({
     position: "absolute",
     bottom: 5,
     left: 0,
+  },
+  deliveryIndicator: {
+    color: "rgba(255, 255, 255, 0.7)",
+    fontSize: 12,
+    textAlign: "right",
+    marginTop: 4,
   },
 });
