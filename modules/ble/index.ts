@@ -2,4 +2,3 @@
 // and on native platforms to BleModule.ts
 export * from "./src/Ble.types";
 export { default } from "./src/BleModule";
-

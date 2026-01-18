@@ -15,7 +15,7 @@ async function getDB(): Promise<SQLite.SQLiteDatabase> {
 }
 
 async function migrateDb(db: SQLiteDatabase) {
-  const DATABASE_VERSION = 1;
+  const DATABASE_VERSION = 2;
 
   const result = await db.getFirstAsync<{
     user_version: number;
@@ -40,6 +40,7 @@ async function migrateDb(db: SQLiteDatabase) {
         timestamp INTEGER NOT NULL,
         group_id TEXT,
         was_read INTEGER NOT NULL DEFAULT 0,
+        delivery_status INTEGER NOT NULL DEFAULT 1,
         FOREIGN KEY (group_id) REFERENCES groups(id) ON DELETE CASCADE
       );
       
@@ -160,7 +161,15 @@ async function migrateDb(db: SQLiteDatabase) {
     currentDbVersion = 1;
   }
 
-  // if (currentDbVersion === 2) {
+  if (currentDbVersion === 1) {
+    console.log("migrating v1 -> v2: adding delivery_status column");
+    await db.execAsync(`
+      ALTER TABLE messages ADD COLUMN delivery_status INTEGER NOT NULL DEFAULT 1;
+    `);
+    currentDbVersion = 2;
+  }
+
+  // if (currentDbVersion === 3) {
   //   Add more migrations
   // }
   await db.execAsync(`PRAGMA user_version = ${DATABASE_VERSION}`);

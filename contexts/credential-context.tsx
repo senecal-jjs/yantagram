@@ -5,11 +5,11 @@ import { generateRandomName } from "@/utils/names";
 import { secureFetch, secureStore } from "@/utils/secure-store";
 import { getRandomBytes } from "expo-crypto";
 import React, {
-    createContext,
-    ReactNode,
-    useContext,
-    useEffect,
-    useState,
+  createContext,
+  ReactNode,
+  useContext,
+  useEffect,
+  useState,
 } from "react";
 
 const MEMBER_STATE_FILENAME = "member_state.enc";

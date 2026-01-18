@@ -1,26 +1,29 @@
 import {
-    serializeEncryptedMessage,
-    serializeUpdateMessage,
-    serializeWelcomeMessage,
+  serializeEncryptedMessage,
+  serializeUpdateMessage,
+  serializeWelcomeMessage,
 } from "@/amigo/protocol";
 import { UpdateMessage, WelcomeMessage } from "@/amigo/types";
 import { useCredentials } from "@/contexts/credential-context";
 import {
-    MessagesRepositoryToken,
-    OutgoingMessagesRepositoryToken,
-    useRepos,
+  MessagesRepositoryToken,
+  OutgoingMessagesRepositoryToken,
+  useRepos,
 } from "@/contexts/repository-context";
 import BleModule from "@/modules/ble/src/BleModule";
 import MessagesRepository from "@/repos/specs/messages-repository";
 import OutgoingMessagesRepository from "@/repos/specs/outgoing-messages-repository";
 import { fragmentPayload } from "@/services/frag-service";
 import { toBinaryPayload } from "@/services/message-protocol-service";
-import { encode } from "@/services/packet-protocol-service";
 import {
-    BitchatPacket,
-    FragmentType,
-    Message,
-    PacketType,
+  encode,
+  serializeDeliveryAck,
+} from "@/services/packet-protocol-service";
+import {
+  BitchatPacket,
+  FragmentType,
+  Message,
+  PacketType,
 } from "@/types/global";
 import { sleep } from "@/utils/sleep";
 import Constants from "expo-constants";
@@ -152,5 +155,41 @@ export function useMessageSender() {
     }
   };
 
-  return { sendMessage, sendAmigoWelcome, sendAmigoPathUpdate };
+  return {
+    sendMessage,
+    sendAmigoWelcome,
+    sendAmigoPathUpdate,
+    sendDeliveryAck,
+  };
+
+  /**
+   * Broadcast a delivery acknowledgement for a received message.
+   * This notifies the sender that the message was successfully delivered.
+   */
+  async function sendDeliveryAck(messageId: string): Promise<void> {
+    const ackPayload = serializeDeliveryAck({
+      messageId,
+      timestamp: Date.now(),
+    });
+
+    const packet: BitchatPacket = {
+      version: 1,
+      type: PacketType.DELIVERY_ACK,
+      timestamp: Date.now(),
+      payload: ackPayload,
+      allowedHops: 3,
+    };
+
+    const encoded = encode(packet);
+
+    if (!encoded) {
+      throw new Error("Failed to encode delivery ACK packet");
+    }
+
+    try {
+      await BleModule.broadcastPacketAsync(encoded, []);
+    } catch (error) {
+      console.error("[DeliveryAck] Failed to broadcast:", error);
+    }
+  }
 }

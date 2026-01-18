@@ -132,6 +132,5 @@ export {
   decompress,
   estimateCompressionRatio,
   getCompressionThreshold,
-  shouldCompress
+  shouldCompress,
 };
-

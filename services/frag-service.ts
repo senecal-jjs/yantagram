@@ -208,6 +208,5 @@ export {
   AssembledData,
   extractFragmentMetadata,
   fragmentPayload,
-  reassembleFragments
+  reassembleFragments,
 };
-

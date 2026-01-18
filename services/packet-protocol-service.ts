@@ -221,3 +221,74 @@ const decodeCore = (raw: Uint8Array): BitchatPacket | null => {
 };
 
 export { decode, encode };
+
+/**
+ * DeliveryAck payload structure for acknowledging message delivery
+ */
+export interface DeliveryAck {
+  messageId: string;
+  timestamp: number;
+}
+
+/**
+ * Serialize a DeliveryAck to binary format
+ * Format:
+ * - 1 byte: message ID length (uint8)
+ * - N bytes: message ID (UTF-8 string)
+ * - 8 bytes: timestamp (uint64, big-endian)
+ */
+export const serializeDeliveryAck = (ack: DeliveryAck): Uint8Array => {
+  const encoder = new TextEncoder();
+  const messageIdBytes = encoder.encode(ack.messageId);
+
+  if (messageIdBytes.length > 255) {
+    throw new Error("Message ID too long (max 255 bytes)");
+  }
+
+  const data: number[] = [];
+
+  // Message ID length (1 byte)
+  data.push(messageIdBytes.length);
+
+  // Message ID bytes
+  data.push(...Array.from(messageIdBytes));
+
+  // Timestamp (8 bytes, big-endian)
+  const timestamp = ack.timestamp;
+  for (let shift = 56; shift >= 0; shift -= 8) {
+    data.push((timestamp >>> shift) & 0xff);
+  }
+
+  return new Uint8Array(data);
+};
+
+/**
+ * Deserialize binary data to DeliveryAck
+ */
+export const deserializeDeliveryAck = (
+  data: Uint8Array,
+): DeliveryAck | null => {
+  if (data.length < 9) return null; // minimum: 1 byte length + 0 bytes id + 8 bytes timestamp
+
+  let offset = 0;
+
+  // Read message ID length
+  const messageIdLength = data[offset++];
+
+  if (data.length < 1 + messageIdLength + 8) return null;
+
+  // Read message ID
+  const messageIdBytes = data.slice(offset, offset + messageIdLength);
+  offset += messageIdLength;
+
+  const decoder = new TextDecoder();
+  const messageId = decoder.decode(messageIdBytes);
+
+  // Read timestamp (8 bytes, big-endian)
+  let timestamp = 0;
+  for (let i = 0; i < 8; i++) {
+    timestamp = (timestamp << 8) | data[offset++];
+  }
+
+  return { messageId, timestamp };
+};
