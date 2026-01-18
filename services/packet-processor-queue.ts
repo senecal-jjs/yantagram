@@ -6,6 +6,7 @@ import { randomUUID } from "expo-crypto";
 type QueueItem = {
   id: string;
   packet: BitchatPacket;
+  deviceUUID: string;
   timestamp: number;
   retries: number;
 };
@@ -19,10 +20,11 @@ class PacketProcessorQueue extends EventEmitter {
   private maxConcurrent = 5;
   private activeProcessing = 0;
 
-  async enqueue(packet: BitchatPacket): Promise<void> {
+  async enqueue(packet: BitchatPacket, deviceUUID: string): Promise<void> {
     const item: QueueItem = {
       id: randomUUID(),
       packet,
+      deviceUUID,
       timestamp: Date.now(),
       retries: 0,
     };
@@ -68,7 +70,7 @@ class PacketProcessorQueue extends EventEmitter {
     try {
       this.emit("processing", item);
       // Processor will be set via setProcessor method
-      await this.processor?.(item.packet);
+      await this.processor?.(item.packet, item.deviceUUID);
       this.emit("processed", item);
     } catch (error) {
       console.error(`Failed to process packet ${item.id}:`, error);
@@ -85,9 +87,14 @@ class PacketProcessorQueue extends EventEmitter {
     }
   }
 
-  private processor?: (packet: BitchatPacket) => Promise<void>;
+  private processor?: (
+    packet: BitchatPacket,
+    deviceUUID: string,
+  ) => Promise<void>;
 
-  setProcessor(fn: (packet: BitchatPacket) => Promise<void>) {
+  setProcessor(
+    fn: (packet: BitchatPacket, deviceUUID: string) => Promise<void>,
+  ) {
     this.processor = fn;
   }
 

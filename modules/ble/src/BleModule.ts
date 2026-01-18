@@ -7,6 +7,11 @@ declare class BleModule extends NativeModule<BleModuleEvents> {
     value: Uint8Array,
     blackoutDeviceUUIDs: string[],
   ): Promise<void>;
+
+  directBroadcastPacketAsync(
+    value: Uint8Array,
+    deviceUUID: string,
+  ): Promise<void>;
 }
 
 // This call loads the native module object from the JSI.

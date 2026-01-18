@@ -1,5 +1,5 @@
 import { Tabs } from "expo-router";
-import React from "react";
+import React, { useEffect } from "react";
 
 import { HapticTab } from "@/components/haptic-tab";
 import { IconSymbol } from "@/components/ui/icon-symbol";
@@ -12,6 +12,11 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 import { usePacketService } from "@/hooks/use-packet-service";
 import BleModule from "@/modules/ble";
 import ConnectedDevicesRepository from "@/repos/specs/connected-devices-repository";
+import {
+  getGossipSyncManager,
+  GossipSyncDelegate,
+} from "@/services/gossip-sync-manager";
+import * as PacketProtocolService from "@/services/packet-protocol-service";
 import { useEventListener } from "expo";
 
 export default function TabLayout() {
@@ -22,6 +27,52 @@ export default function TabLayout() {
   const connectedDevicesRepo = getRepo<ConnectedDevicesRepository>(
     ConnectedDevicesRepositoryToken,
   );
+  const syncManager = getGossipSyncManager();
+
+  // Set up queue processor and periodic cleanup
+  useEffect(() => {
+    // Clear stale connected devices from previous sessions on app start
+    // The native BLE module starts fresh, so any persisted "connected" devices are stale
+    connectedDevicesRepo.deleteAll().then(() => {
+      console.log(
+        "[DeviceCleanup] Cleared stale devices from previous session",
+      );
+    });
+
+    // Set up the delegate to send packets via BLE
+    const delegate: GossipSyncDelegate = {
+      broadcastPacket: (packet) => {
+        const binary = PacketProtocolService.encode(packet);
+        if (binary) {
+          BleModule.broadcastPacketAsync(binary, []);
+        }
+      },
+      sendPacketToDevice: (deviceUUID, packet) => {
+        const binary = PacketProtocolService.encode(packet);
+        if (binary) {
+          BleModule.directBroadcastPacketAsync(binary, deviceUUID);
+        }
+      },
+    };
+
+    syncManager.setDelegate(delegate);
+    syncManager.start();
+
+    // Periodically clean up stale connected devices (not seen in 1 minute)
+    const STALE_DEVICE_THRESHOLD_MS = 1 * 60 * 1000; // 1 minute
+    const cleanupInterval = setInterval(async () => {
+      const deleted = await connectedDevicesRepo.deleteStale(
+        STALE_DEVICE_THRESHOLD_MS,
+      );
+      if (deleted > 0) {
+        console.log(`[DeviceCleanup] Removed ${deleted} stale devices`);
+      }
+    }, 60 * 1000); // Run every minute
+
+    return () => {
+      clearInterval(cleanupInterval);
+    };
+  }, []);
 
   useEventListener(BleModule, "onPeripheralReceivedWrite", (message) => {
     console.log("onPeripheralReceivedWrite: ", message.deviceUUID);
@@ -48,7 +99,7 @@ export default function TabLayout() {
 
   useEventListener(BleModule, "onPeripheralDisconnect", (connection) => {
     console.log("onPeripheralDisconnect: ", connection.deviceUUID);
-    connectedDevicesRepo.updateConnectionStatus(connection.deviceUUID, false);
+    connectedDevicesRepo.delete(connection.deviceUUID);
   });
 
   useEventListener(BleModule, "onReadRSSI", (connection) => {
@@ -65,11 +116,12 @@ export default function TabLayout() {
       connection.rssi ?? null,
       true,
     );
+    syncManager.scheduleInitialSyncToDevice(connection.deviceUUID, 1000);
   });
 
   useEventListener(BleModule, "onCentralUnsubscription", (connection) => {
     console.log("onCentralUnsubscription: ", connection.deviceUUID);
-    connectedDevicesRepo.updateConnectionStatus(connection.deviceUUID, false);
+    connectedDevicesRepo.delete(connection.deviceUUID);
   });
 
   return (

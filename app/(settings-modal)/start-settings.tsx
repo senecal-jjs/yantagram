@@ -41,6 +41,13 @@ export default function StartSettingsScreen() {
   useEffect(() => {
     const fetchConnectedDevices = async () => {
       const devices = await connectedDevicesRepo.getAllConnected();
+      // Sort by signal strength (highest/strongest first, null values at the end)
+      devices.sort((a, b) => {
+        if (a.lastSeenRSSI === null && b.lastSeenRSSI === null) return 0;
+        if (a.lastSeenRSSI === null) return 1;
+        if (b.lastSeenRSSI === null) return -1;
+        return b.lastSeenRSSI - a.lastSeenRSSI; // Higher RSSI = stronger signal
+      });
       setConnectedDevices(devices);
     };
 

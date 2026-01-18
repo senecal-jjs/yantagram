@@ -192,6 +192,20 @@ class SQConnectedDevicesRepository
     }
   }
 
+  async deleteStale(olderThanMs: number): Promise<number> {
+    const cutoff = Date.now() - olderThanMs;
+    const statement = await this.db.prepareAsync(
+      "DELETE FROM connected_devices WHERE last_seen_at < $cutoff",
+    );
+
+    try {
+      const result = await statement.executeAsync({ $cutoff: cutoff });
+      return result.changes;
+    } finally {
+      await statement.finalizeAsync();
+    }
+  }
+
   private mapRowToDevice(row: {
     id: number;
     device_uuid: string;

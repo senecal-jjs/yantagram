@@ -15,7 +15,7 @@ async function getDB(): Promise<SQLite.SQLiteDatabase> {
 }
 
 async function migrateDb(db: SQLiteDatabase) {
-  const DATABASE_VERSION = 1;
+  const DATABASE_VERSION = 2;
 
   const result = await db.getFirstAsync<{
     user_version: number;
@@ -158,6 +158,30 @@ async function migrateDb(db: SQLiteDatabase) {
       CREATE INDEX idx_connected_devices_last_seen_at ON connected_devices(last_seen_at);
 `);
     currentDbVersion = 1;
+  }
+
+  if (currentDbVersion === 1) {
+    console.log("migrating to version 2 - adding sync_packets table");
+    await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS sync_packets (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        packet_id_hex TEXT NOT NULL,
+        category TEXT NOT NULL,
+        version INTEGER NOT NULL,
+        type INTEGER NOT NULL,
+        timestamp INTEGER NOT NULL,
+        payload BLOB NOT NULL,
+        allowed_hops INTEGER NOT NULL,
+        created_at INTEGER NOT NULL DEFAULT (round(unixepoch('subsec') * 1000)),
+        UNIQUE(packet_id_hex, category)
+      );
+      
+      CREATE INDEX idx_sync_packets_packet_id_hex ON sync_packets(packet_id_hex);
+      CREATE INDEX idx_sync_packets_category ON sync_packets(category);
+      CREATE INDEX idx_sync_packets_timestamp ON sync_packets(timestamp);
+      CREATE INDEX idx_sync_packets_created_at ON sync_packets(created_at);
+    `);
+    currentDbVersion = 2;
   }
 
   // if (currentDbVersion === 2) {
