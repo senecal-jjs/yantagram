@@ -12,14 +12,14 @@ export default interface MessagesRepository {
     groupId: string,
     sender: string,
     contents: string,
-    timestamp: number
+    timestamp: number,
   ): Promise<Message>;
   get(id: UUID): Promise<Message>;
   getAll(limit: number): Promise<Message[]>;
   getByGroupId(
     groupId: string,
     limit: number,
-    offset?: number
+    offset?: number,
   ): Promise<MessageWithPseudonym[]>;
   exists(id: UUID): Promise<boolean>;
   markGroupAsRead(groupId: UUID, notifyListener: boolean): Promise<void>;
