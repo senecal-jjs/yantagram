@@ -731,6 +731,13 @@ extension BleManager: CBPeripheralManagerDelegate {
         // Can now send notifications to this central
       subscribedCentrals.append(central)
       
+      // Check if we're also connected to this device as a peripheral (bidirectional connection)
+      // If so, we can read RSSI via the peripheral object
+      let centralUUID = central.identifier.uuidString
+      if let state = peripherals[centralUUID], state.isConnected {
+        state.peripheral.readRSSI()
+      }
+      
       onCentralSubscription(central.identifier.uuidString, nil)
     }
     
