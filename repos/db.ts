@@ -15,7 +15,7 @@ async function getDB(): Promise<SQLite.SQLiteDatabase> {
 }
 
 async function migrateDb(db: SQLiteDatabase) {
-  const DATABASE_VERSION = 2;
+  const DATABASE_VERSION = 1;
 
   const result = await db.getFirstAsync<{
     user_version: number;
@@ -30,7 +30,7 @@ async function migrateDb(db: SQLiteDatabase) {
   }
 
   if (currentDbVersion === 0) {
-    console.log("migrating");
+    console.log("migrating to v1");
     await db.execAsync(`
       PRAGMA journal_mode = 'wal';
       CREATE TABLE IF NOT EXISTS messages (
@@ -157,14 +157,6 @@ async function migrateDb(db: SQLiteDatabase) {
       CREATE INDEX idx_connected_devices_device_uuid ON connected_devices(device_uuid);
       CREATE INDEX idx_connected_devices_is_connected ON connected_devices(is_connected);
       CREATE INDEX idx_connected_devices_last_seen_at ON connected_devices(last_seen_at);
-`);
-    currentDbVersion = 1;
-  }
-
-  if (currentDbVersion === 1) {
-    console.log("migrating v1 -> v2: adding delivery_status column");
-    await db.execAsync(`
-      ALTER TABLE messages ADD COLUMN delivery_status INTEGER NOT NULL DEFAULT 1;
 
       CREATE TABLE IF NOT EXISTS sync_packets (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -183,11 +175,11 @@ async function migrateDb(db: SQLiteDatabase) {
       CREATE INDEX idx_sync_packets_category ON sync_packets(category);
       CREATE INDEX idx_sync_packets_timestamp ON sync_packets(timestamp);
       CREATE INDEX idx_sync_packets_created_at ON sync_packets(created_at);
-    `);
-    currentDbVersion = 2;
+`);
+    currentDbVersion = 1;
   }
 
-  // if (currentDbVersion === 3) {
+  // if (currentDbVersion === 1) {
   //   Add more migrations
   // }
   await db.execAsync(`PRAGMA user_version = ${DATABASE_VERSION}`);

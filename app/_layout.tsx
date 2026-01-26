@@ -16,6 +16,7 @@ import { useMessageRetention } from "@/hooks/use-message-retention";
 import { useRelayWorker } from "@/hooks/use-relay-worker";
 import { migrateDb } from "@/repos/db";
 import { Buffer } from "buffer";
+import * as SQLite from "expo-sqlite";
 import { SQLiteProvider } from "expo-sqlite";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import "react-native-get-random-values";
@@ -36,7 +37,7 @@ function BackgroundTasks({ children }: { children: React.ReactNode }) {
 }
 
 export default function RootLayout() {
-  // SQLite.deleteDatabaseAsync("bitchat.db");
+  SQLite.deleteDatabaseAsync("bitchat.db");
   const colorScheme = useColorScheme();
 
   return (
