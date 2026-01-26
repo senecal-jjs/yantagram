@@ -165,6 +165,24 @@ async function migrateDb(db: SQLiteDatabase) {
     console.log("migrating v1 -> v2: adding delivery_status column");
     await db.execAsync(`
       ALTER TABLE messages ADD COLUMN delivery_status INTEGER NOT NULL DEFAULT 1;
+
+      CREATE TABLE IF NOT EXISTS sync_packets (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        packet_id_hex TEXT NOT NULL,
+        category TEXT NOT NULL,
+        version INTEGER NOT NULL,
+        type INTEGER NOT NULL,
+        timestamp INTEGER NOT NULL,
+        payload BLOB NOT NULL,
+        allowed_hops INTEGER NOT NULL,
+        created_at INTEGER NOT NULL DEFAULT (round(unixepoch('subsec') * 1000)),
+        UNIQUE(packet_id_hex, category)
+      );
+      
+      CREATE INDEX idx_sync_packets_packet_id_hex ON sync_packets(packet_id_hex);
+      CREATE INDEX idx_sync_packets_category ON sync_packets(category);
+      CREATE INDEX idx_sync_packets_timestamp ON sync_packets(timestamp);
+      CREATE INDEX idx_sync_packets_created_at ON sync_packets(created_at);
     `);
     currentDbVersion = 2;
   }

@@ -24,4 +24,6 @@ export default interface ConnectedDevicesRepository {
   ): Promise<void>;
   delete(deviceUUID: string): Promise<void>;
   deleteAll(): Promise<void>;
+  /** Delete devices not seen since the given timestamp */
+  deleteStale(olderThanMs: number): Promise<number>;
 }
