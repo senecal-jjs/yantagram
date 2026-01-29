@@ -32,6 +32,9 @@ let activeChatId: string | null = null;
 // Track if notifications are enabled (set from settings)
 let notificationsEnabled = true;
 
+// Track if app is in foreground (device unlocked and app visible)
+let isAppInForeground = true;
+
 // Callback to get unread message count from repository
 let getUnreadCountCallback: (() => Promise<number>) | null = null;
 
@@ -78,6 +81,14 @@ export function setNotificationsEnabled(enabled: boolean): void {
 }
 
 /**
+ * Update the app foreground state.
+ * When the app is in background (device locked), notifications should always show.
+ */
+export function setAppForegroundState(inForeground: boolean): void {
+  isAppInForeground = inForeground;
+}
+
+/**
  * Check if a notification should be shown for a given chat.
  */
 export function shouldShowNotification(groupId: string): boolean {
@@ -86,13 +97,14 @@ export function shouldShowNotification(groupId: string): boolean {
     return false;
   }
 
-  // Don't show if user is currently viewing this chat
-  if (activeChatId === groupId) {
+  // Only suppress notifications when:
+  // 1. App is in foreground (device unlocked, app visible)
+  // 2. AND user is currently viewing this specific chat
+  // When app is in background (device locked), always show notifications
+  if (isAppInForeground && activeChatId === groupId) {
     return false;
   }
 
-  // Only show when app is in background or inactive
-  // (We show in foreground too but only for other chats)
   return true;
 }
 

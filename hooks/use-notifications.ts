@@ -1,5 +1,6 @@
 import {
     requestNotificationPermissions,
+    setAppForegroundState,
     setupNotificationResponseHandler,
     syncBadgeWithUnreadCount,
 } from "@/services/notification-service";
@@ -37,9 +38,16 @@ export function useNotifications() {
 
   // Track app state (foreground/background)
   useEffect(() => {
+    // Set initial foreground state
+    setAppForegroundState(AppState.currentState === "active");
+
     const subscription = AppState.addEventListener("change", (nextAppState) => {
       appStateRef.current = nextAppState;
       setAppState(nextAppState);
+
+      // Update foreground state in notification service
+      const inForeground = nextAppState === "active";
+      setAppForegroundState(inForeground);
 
       if (nextAppState === "active") {
         console.log("[Notifications] App came to foreground");
