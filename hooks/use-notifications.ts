@@ -1,6 +1,7 @@
 import {
     requestNotificationPermissions,
     setupNotificationResponseHandler,
+    syncBadgeWithUnreadCount,
 } from "@/services/notification-service";
 import { useEffect, useRef, useState } from "react";
 import { AppState, AppStateStatus } from "react-native";
@@ -42,6 +43,13 @@ export function useNotifications() {
 
       if (nextAppState === "active") {
         console.log("[Notifications] App came to foreground");
+        // Sync badge with database when app comes to foreground
+        syncBadgeWithUnreadCount().catch((error) => {
+          console.error(
+            "[Notifications] Failed to sync badge on foreground:",
+            error,
+          );
+        });
       } else if (nextAppState === "background") {
         console.log("[Notifications] App went to background");
       }

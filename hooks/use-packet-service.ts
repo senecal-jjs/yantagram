@@ -44,6 +44,7 @@ import { fromBinaryPayload } from "@/services/message-protocol-service";
 import {
   shouldShowNotification,
   showMessageNotification,
+  syncBadgeWithUnreadCount,
 } from "@/services/notification-service";
 import { packetQueue } from "@/services/packet-processor-queue";
 import * as PacketProtocolService from "@/services/packet-protocol-service";
@@ -445,6 +446,9 @@ export function usePacketService() {
                   groupName,
                   messagePreview,
                 });
+
+                // Sync badge with unread count
+                await syncBadgeWithUnreadCount();
               } catch (notifError) {
                 console.error(
                   "[PacketService] Failed to show notification:",

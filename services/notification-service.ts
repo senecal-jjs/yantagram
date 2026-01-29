@@ -10,10 +10,10 @@ import { Platform } from "react-native";
 // Configure how notifications are displayed when app is in foreground
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
+    shouldShowAlert: false,
+    shouldPlaySound: false,
     shouldSetBadge: true,
-    shouldShowBanner: true,
+    shouldShowBanner: false,
     shouldShowList: true,
   }),
 });
@@ -31,6 +31,37 @@ let activeChatId: string | null = null;
 
 // Track if notifications are enabled (set from settings)
 let notificationsEnabled = true;
+
+// Callback to get unread message count from repository
+let getUnreadCountCallback: (() => Promise<number>) | null = null;
+
+/**
+ * Register a callback to get the unread message count.
+ * This is called from the app to inject the repository dependency.
+ */
+export function registerUnreadCountCallback(
+  callback: () => Promise<number>,
+): void {
+  getUnreadCountCallback = callback;
+}
+
+/**
+ * Sync the app badge with the unread message count.
+ */
+export async function syncBadgeWithUnreadCount(): Promise<void> {
+  if (!getUnreadCountCallback) {
+    console.warn("[Notifications] No unread count callback registered");
+    return;
+  }
+
+  try {
+    const count = await getUnreadCountCallback();
+    await Notifications.setBadgeCountAsync(count);
+    console.log(`[Notifications] Badge synced to ${count} unread messages`);
+  } catch (error) {
+    console.error("[Notifications] Failed to sync badge:", error);
+  }
+}
 
 /**
  * Update the active chat ID from the context.

@@ -1,3 +1,4 @@
+import { syncBadgeWithUnreadCount } from "@/services/notification-service";
 import * as Crypto from "expo-crypto";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -80,9 +81,17 @@ export default function Chat() {
       // Set this chat as active when screen is focused
       setActiveChat(chatId);
 
+      // Sync badge after a short delay to account for messages being marked as read during render
+      const badgeSyncTimeout = setTimeout(() => {
+        syncBadgeWithUnreadCount().catch((error) => {
+          console.error("[Chat] Failed to sync badge:", error);
+        });
+      }, 500);
+
       // Clear active chat when screen loses focus
       return () => {
         setActiveChat(null);
+        clearTimeout(badgeSyncTimeout);
       };
     }, [chatId, setActiveChat]),
   );
