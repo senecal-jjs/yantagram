@@ -12,7 +12,9 @@ import {
   GroupMembersRepositoryToken,
   GroupsRepositoryToken,
   IncomingPacketsRepositoryToken,
+  MessageDeliveryRepositoryToken,
   MessagesRepositoryToken,
+  OutgoingMessagesRepositoryToken,
   RelayPacketsRepositoryToken,
   SyncPacketsRepositoryToken,
   useRepos,
@@ -24,7 +26,9 @@ import FragmentsRepository from "@/repos/specs/fragments-repository";
 import { GroupMembersRepository } from "@/repos/specs/group-members-repository";
 import GroupsRepository from "@/repos/specs/groups-repository";
 import IncomingPacketsRepository from "@/repos/specs/incoming-packets-repository";
+import MessageDeliveryRepository from "@/repos/specs/message-delivery-repository";
 import MessagesRepository from "@/repos/specs/messages-repository";
+import OutgoingMessagesRepository from "@/repos/specs/outgoing-messages-repository";
 import RelayPacketsRepository from "@/repos/specs/relay-packets-repository";
 import SyncPacketsRepository from "@/repos/specs/sync-packets-repository";
 import {
@@ -81,6 +85,12 @@ export function usePacketService() {
   );
   const syncPacketsRepository = getRepo<SyncPacketsRepository>(
     SyncPacketsRepositoryToken,
+  );
+  const messageDeliveryRepository = getRepo<MessageDeliveryRepository>(
+    MessageDeliveryRepositoryToken,
+  );
+  const outgoingMessagesRepository = getRepo<OutgoingMessagesRepository>(
+    OutgoingMessagesRepositoryToken,
   );
   const { member, saveMember } = useCredentials();
   const { sendAmigoPathUpdate, sendDeliveryAck } = useMessageSender();
@@ -470,7 +480,9 @@ export function usePacketService() {
 
   /**
    * Handle delivery acknowledgement packets.
-   * Updates the delivery status of the original message to DELIVERED.
+   * Updates the delivery receipt for the specific recipient and
+   * updates message status to DELIVERED if all recipients have received.
+   * Removes the message from the outgoing queue when fully delivered.
    */
   const handleDeliveryAck = async (ackBytes: Uint8Array) => {
     try {
@@ -481,16 +493,48 @@ export function usePacketService() {
         return;
       }
 
+      console.log(
+        `[DeliveryAck] Received ack for message ${ack.messageId} from ${ack.senderVerificationKey}`,
+      );
+
       // Check if we have this message (we're the sender)
       const messageExists = await messagesRepository.exists(ack.messageId);
 
       if (messageExists) {
-        await messagesRepository.updateDeliveryStatus(
+        // Get existing receipts to debug
+        const receipts = await messageDeliveryRepository.getReceipts(
           ack.messageId,
-          DeliveryStatus.DELIVERED,
         );
         console.log(
-          `[DeliveryAck] Message ${ack.messageId} marked as DELIVERED`,
+          `[DeliveryAck] Existing receipts for message:`,
+          receipts.map((r) => r.recipientVerificationKey),
+        );
+
+        // Mark this specific recipient as delivered
+        await messageDeliveryRepository.markDelivered(
+          ack.messageId,
+          ack.senderVerificationKey,
+        );
+
+        // Check delivery stats to determine overall status
+        const stats = await messageDeliveryRepository.getDeliveryStats(
+          ack.messageId,
+        );
+
+        // If all recipients have received, or if there are no tracked recipients
+        // (legacy 1:1 case), mark message as DELIVERED and remove from outgoing queue
+        if (stats.total === 0 || stats.delivered >= stats.total) {
+          await messagesRepository.updateDeliveryStatus(
+            ack.messageId,
+            DeliveryStatus.DELIVERED,
+          );
+
+          // Remove from outgoing messages queue - no more retries needed
+          await outgoingMessagesRepository.delete(ack.messageId);
+        }
+
+        console.log(
+          `[DeliveryAck] Message ${ack.messageId} - ${stats.delivered}/${stats.total} delivered`,
         );
       }
     } catch (error) {

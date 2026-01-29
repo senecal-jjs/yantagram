@@ -1,5 +1,6 @@
+import { DeliveryStats } from "@/repos/specs/message-delivery-repository";
 import { DeliveryStatus, Message } from "@/types/global";
-import { StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { SvgXml } from "react-native-svg";
 
 export interface ChatBubbleProps {
@@ -7,6 +8,9 @@ export interface ChatBubbleProps {
   contactPseudonym: string;
   showPseudonym: boolean;
   verificationKey: string;
+  groupSize?: number; // total group members including self
+  deliveryStats?: DeliveryStats; // for groups
+  onDeliveryPress?: (messageId: string) => void; // callback when delivery label is pressed
 }
 
 // Xml strings for left and right curl svg
@@ -21,17 +25,33 @@ const curlLeft = `<svg width="17" height="21" viewBox="0 0 17 21" fill="none" xm
 `;
 
 /**
- * Get delivery status indicator text for sent messages
+ * Get delivery status label text for sent messages
  */
-const getDeliveryIndicator = (status?: DeliveryStatus): string => {
+const getDeliveryLabel = (
+  status?: DeliveryStatus,
+  groupSize?: number,
+  deliveryStats?: DeliveryStats,
+): string => {
+  // For groups with more than 2 members (1 other person), show detailed stats
+  if (groupSize && groupSize > 2 && deliveryStats && deliveryStats.total > 0) {
+    if (deliveryStats.delivered === 0) {
+      return "Sent";
+    } else if (deliveryStats.delivered >= deliveryStats.total) {
+      return "Delivered to all";
+    } else {
+      return `Delivered to ${deliveryStats.delivered}/${deliveryStats.total}`;
+    }
+  }
+
+  // Simple 1:1 chat or fallback
   switch (status) {
     case DeliveryStatus.DELIVERED:
     case DeliveryStatus.READ:
-      return "\u2713\u2713"; // Double checkmark
+      return "Delivered";
     case DeliveryStatus.SENT:
     case DeliveryStatus.SENDING:
     default:
-      return "\u2713"; // Single checkmark
+      return "Sent";
   }
 };
 
@@ -40,36 +60,56 @@ export const ChatBubble = ({
   contactPseudonym,
   showPseudonym,
   verificationKey,
+  groupSize,
+  deliveryStats,
+  onDeliveryPress,
 }: ChatBubbleProps) => {
+  const isMyMessage = message.sender === verificationKey;
+  const isGroup = groupSize && groupSize > 2;
+
+  const deliveryLabel = getDeliveryLabel(
+    message.deliveryStatus,
+    groupSize,
+    deliveryStats,
+  );
+
   return (
     <View>
-      {message.sender !== verificationKey && showPseudonym && (
+      {!isMyMessage && showPseudonym && (
         <Text style={styles.pseudonymText}>{contactPseudonym}</Text>
+      )}
+      {isMyMessage && (
+        <Pressable
+          onPress={() => {
+            if (isGroup && onDeliveryPress) {
+              onDeliveryPress(message.id);
+            }
+          }}
+          disabled={!isGroup || !onDeliveryPress}
+        >
+          <Text
+            style={[
+              styles.deliveryLabel,
+              isGroup && onDeliveryPress ? styles.deliveryLabelClickable : null,
+            ]}
+          >
+            {deliveryLabel}
+          </Text>
+        </Pressable>
       )}
       <View
         style={[
           styles.bubble,
-          message.sender === verificationKey
-            ? styles.myMessage
-            : styles.theirMessage,
+          isMyMessage ? styles.myMessage : styles.theirMessage,
         ]}
       >
         <Text
-          style={
-            message.sender === verificationKey
-              ? styles.myMessageText
-              : styles.theirMessageText
-          }
+          style={isMyMessage ? styles.myMessageText : styles.theirMessageText}
         >
           {message.contents}
         </Text>
-        {message.sender === verificationKey && (
-          <Text style={styles.deliveryIndicator}>
-            {getDeliveryIndicator(message.deliveryStatus)}
-          </Text>
-        )}
       </View>
-      {message.sender !== verificationKey ? (
+      {!isMyMessage ? (
         <SvgXml xml={curlLeft} width={20} height={20} style={styles.curlLeft} />
       ) : (
         <SvgXml
@@ -128,10 +168,14 @@ const styles = StyleSheet.create({
     bottom: 5,
     left: 0,
   },
-  deliveryIndicator: {
-    color: "rgba(255, 255, 255, 0.7)",
+  deliveryLabel: {
+    color: "#7e7e82ff",
     fontSize: 12,
     textAlign: "right",
-    marginTop: 4,
+    marginRight: 10,
+    marginBottom: 2,
+  },
+  deliveryLabelClickable: {
+    textDecorationLine: "underline",
   },
 });

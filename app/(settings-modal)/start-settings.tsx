@@ -101,6 +101,7 @@ export default function StartSettingsScreen() {
                 ],
               );
             } catch (error) {
+              console.log(error);
               Alert.alert(
                 "Error",
                 "Failed to delete all data. Please try again.",
@@ -132,6 +133,7 @@ export default function StartSettingsScreen() {
                 "All messages have been deleted successfully.",
               );
             } catch (error) {
+              console.log(error);
               Alert.alert(
                 "Error",
                 "Failed to delete messages. Please try again.",

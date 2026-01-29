@@ -69,6 +69,8 @@ async function migrateDb(db: SQLiteDatabase) {
         contents TEXT NOT NULL,
         timestamp INTEGER NOT NULL,
         group_id TEXT,
+        retry_count INTEGER NOT NULL DEFAULT 0,
+        last_retry_at INTEGER,
         created_at INTEGER NOT NULL DEFAULT (round(unixepoch('subsec') * 1000)),
         FOREIGN KEY (group_id) REFERENCES groups(id) ON DELETE CASCADE
       );
@@ -175,6 +177,20 @@ async function migrateDb(db: SQLiteDatabase) {
       CREATE INDEX idx_sync_packets_category ON sync_packets(category);
       CREATE INDEX idx_sync_packets_timestamp ON sync_packets(timestamp);
       CREATE INDEX idx_sync_packets_created_at ON sync_packets(created_at);
+
+      CREATE TABLE IF NOT EXISTS message_delivery_receipts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        message_id TEXT NOT NULL,
+        recipient_verification_key TEXT NOT NULL,
+        delivered_at INTEGER,
+        read_at INTEGER,
+        created_at INTEGER NOT NULL DEFAULT (round(unixepoch('subsec') * 1000)),
+        UNIQUE(message_id, recipient_verification_key),
+        FOREIGN KEY (message_id) REFERENCES messages(id) ON DELETE CASCADE
+      );
+
+      CREATE INDEX idx_message_delivery_receipts_message_id ON message_delivery_receipts(message_id);
+      CREATE INDEX idx_message_delivery_receipts_recipient ON message_delivery_receipts(recipient_verification_key);
 `);
     currentDbVersion = 1;
   }

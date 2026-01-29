@@ -4,6 +4,7 @@ import SQFragmentsRepository from "@/repos/impls/sq-fragments-repository";
 import SQGroupMembersRepository from "@/repos/impls/sq-group-members-repository";
 import SQGroupsRepository from "@/repos/impls/sq-groups-repository";
 import SQIncomingPacketsRepository from "@/repos/impls/sq-incoming-packets-repository";
+import SQMessageDeliveryRepository from "@/repos/impls/sq-message-delivery-repository";
 import SQMessagesRepository from "@/repos/impls/sq-messages-repository";
 import SQOutgoingMessagesRepository from "@/repos/impls/sq-outgoing-messages-repository";
 import SQRelayPacketsRepository from "@/repos/impls/sq-relay-packets-repository";
@@ -29,6 +30,9 @@ export const ConnectedDevicesRepositoryToken = Symbol(
   "ConnectedDevicesRepository",
 );
 export const SyncPacketsRepositoryToken = Symbol("SyncPacketsRepository");
+export const MessageDeliveryRepositoryToken = Symbol(
+  "MessageDeliveryRepository",
+);
 
 interface RepositoryContextType {
   repos: Map<symbol, Repository>;
@@ -65,6 +69,10 @@ export const RepositoryProvider: React.FC<{ children: React.ReactNode }> = ({
       new SQConnectedDevicesRepository(db),
     );
     repoMap.set(SyncPacketsRepositoryToken, new SQSyncPacketsRepository(db));
+    repoMap.set(
+      MessageDeliveryRepositoryToken,
+      new SQMessageDeliveryRepository(db),
+    );
     return repoMap;
   }, [db]);
 

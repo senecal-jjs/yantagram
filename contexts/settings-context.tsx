@@ -1,10 +1,10 @@
 import { fetchFromFile, saveToAppDirectory } from "@/utils/file";
 import React, {
-  createContext,
-  ReactNode,
-  useContext,
-  useEffect,
-  useState,
+    createContext,
+    ReactNode,
+    useContext,
+    useEffect,
+    useState,
 } from "react";
 
 interface Settings {

@@ -227,6 +227,7 @@ export { decode, encode };
  */
 export interface DeliveryAck {
   messageId: string;
+  senderVerificationKey: string; // hex string of who is sending the ack
   timestamp: number;
 }
 
@@ -235,14 +236,21 @@ export interface DeliveryAck {
  * Format:
  * - 1 byte: message ID length (uint8)
  * - N bytes: message ID (UTF-8 string)
+ * - 1 byte: sender verification key length (uint8)
+ * - M bytes: sender verification key (hex string as UTF-8)
  * - 8 bytes: timestamp (uint64, big-endian)
  */
 export const serializeDeliveryAck = (ack: DeliveryAck): Uint8Array => {
   const encoder = new TextEncoder();
   const messageIdBytes = encoder.encode(ack.messageId);
+  const senderKeyBytes = encoder.encode(ack.senderVerificationKey);
 
   if (messageIdBytes.length > 255) {
     throw new Error("Message ID too long (max 255 bytes)");
+  }
+
+  if (senderKeyBytes.length > 255) {
+    throw new Error("Sender verification key too long (max 255 bytes)");
   }
 
   const data: number[] = [];
@@ -252,6 +260,12 @@ export const serializeDeliveryAck = (ack: DeliveryAck): Uint8Array => {
 
   // Message ID bytes
   data.push(...Array.from(messageIdBytes));
+
+  // Sender verification key length (1 byte)
+  data.push(senderKeyBytes.length);
+
+  // Sender verification key bytes
+  data.push(...Array.from(senderKeyBytes));
 
   // Timestamp (8 bytes, big-endian)
   const timestamp = ack.timestamp;
@@ -268,14 +282,14 @@ export const serializeDeliveryAck = (ack: DeliveryAck): Uint8Array => {
 export const deserializeDeliveryAck = (
   data: Uint8Array,
 ): DeliveryAck | null => {
-  if (data.length < 9) return null; // minimum: 1 byte length + 0 bytes id + 8 bytes timestamp
+  if (data.length < 11) return null; // minimum: 1 + 0 + 1 + 0 + 8 bytes
 
   let offset = 0;
 
   // Read message ID length
   const messageIdLength = data[offset++];
 
-  if (data.length < 1 + messageIdLength + 8) return null;
+  if (data.length < 1 + messageIdLength + 1 + 8) return null;
 
   // Read message ID
   const messageIdBytes = data.slice(offset, offset + messageIdLength);
@@ -284,11 +298,22 @@ export const deserializeDeliveryAck = (
   const decoder = new TextDecoder();
   const messageId = decoder.decode(messageIdBytes);
 
+  // Read sender verification key length
+  const senderKeyLength = data[offset++];
+
+  if (data.length < 1 + messageIdLength + 1 + senderKeyLength + 8) return null;
+
+  // Read sender verification key
+  const senderKeyBytes = data.slice(offset, offset + senderKeyLength);
+  offset += senderKeyLength;
+
+  const senderVerificationKey = decoder.decode(senderKeyBytes);
+
   // Read timestamp (8 bytes, big-endian)
   let timestamp = 0;
   for (let i = 0; i < 8; i++) {
     timestamp = (timestamp << 8) | data[offset++];
   }
 
-  return { messageId, timestamp };
+  return { messageId, senderVerificationKey, timestamp };
 };
