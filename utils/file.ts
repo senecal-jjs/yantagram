@@ -12,9 +12,12 @@ const saveToAppDirectory = async (
   encryptionKey: Uint8Array | null = null,
 ): Promise<Nonce | null> => {
   try {
-    if (new File(Paths.cache, fileName).exists) return null;
-    const file = new File(Paths.cache, fileName);
-    file.create(); // can throw an error if the file already exists or no permission to create it
+    const file = new File(Paths.document, fileName);
+
+    // Create file if it doesn't exist
+    if (!file.exists) {
+      file.create();
+    }
 
     let dataToWrite = data;
     let nonce: Nonce | null = null;
@@ -43,7 +46,7 @@ const fetchFromFile = async (
   nonce: Nonce | null = null,
 ): Promise<string | null> => {
   try {
-    const file = new File(Paths.cache, fileName);
+    const file = new File(Paths.document, fileName);
     if (!file.exists) {
       console.warn(`File ${fileName} does not exist`);
       return null;
@@ -68,12 +71,12 @@ const fetchFromFile = async (
 };
 
 const fileExists = (fileName: string): boolean => {
-  return new File(Paths.cache, fileName).exists;
+  return new File(Paths.document, fileName).exists;
 };
 
 const deleteFile = async (fileName: string): Promise<boolean> => {
   try {
-    const file = new File(Paths.cache, fileName);
+    const file = new File(Paths.document, fileName);
     if (!file.exists) {
       console.warn(`File ${fileName} does not exist`);
       return false;
