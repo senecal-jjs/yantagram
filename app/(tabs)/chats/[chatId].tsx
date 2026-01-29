@@ -74,6 +74,22 @@ export default function Chat() {
     MessageDeliveryRepositoryToken,
   );
   const flatListRef = useRef<FlatList>(null);
+  const previousMessageCount = useRef(0);
+
+  // Scroll to show newest messages when new ones arrive (for inverted list, scroll to offset 0)
+  useEffect(() => {
+    const currentCount = messages.length;
+    if (
+      previousMessageCount.current > 0 &&
+      currentCount > previousMessageCount.current
+    ) {
+      // New message added - scroll to show it
+      setTimeout(() => {
+        flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+      }, 100);
+    }
+    previousMessageCount.current = currentCount;
+  }, [messages.length]);
 
   // Track active chat for notification suppression
   useFocusEffect(
@@ -137,7 +153,7 @@ export default function Chat() {
     [messageDeliveryRepo],
   );
 
-  // Process messages with date separators
+  // Process messages with date separators (reversed for inverted FlatList)
   const messagesWithSeparators: MessageItem[] = React.useMemo(() => {
     const items: MessageItem[] = [];
     const threshold = 5 * 60 * 1000; // 5 minutes threshold
@@ -210,7 +226,8 @@ export default function Chat() {
       });
     }
 
-    return items;
+    // Reverse for inverted FlatList (newest at top of data = bottom of screen)
+    return items.reverse();
   }, [messages]);
 
   useEffect(() => {
@@ -362,23 +379,14 @@ export default function Chat() {
                 ? item.data.message.id
                 : `separator-${item.timestamp}-${index}`
             }
-            onContentSizeChange={() => {
-              // Delay scroll to ensure layout is complete after input height changes
-              setTimeout(() => {
-                flatListRef.current?.scrollToEnd({ animated: true });
-              }, 100);
-            }}
-            onLayout={() => {
-              flatListRef.current?.scrollToEnd({ animated: true });
-            }}
             onEndReached={handleLoadMore}
             onEndReachedThreshold={0.5}
-            ListFooterComponent={renderFooter}
-            inverted={false}
+            ListHeaderComponent={renderFooter}
+            inverted={true}
             maintainVisibleContentPosition={{
               minIndexForVisible: 0,
             }}
-            contentContainerStyle={{ paddingRight: 5, paddingBottom: 10 }}
+            contentContainerStyle={{ paddingRight: 5, paddingTop: 10 }}
           />
           <View style={styles.inputContainer}>
             <TextInput

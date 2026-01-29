@@ -242,7 +242,13 @@ export function setupNotificationResponseHandler(): () => void {
 
       if (data?.type === "message" && data?.groupId) {
         // Navigate to the chat
-        router.dismissTo(`/(tabs)/chats/${data.groupId}`);
+        if (router.canDismiss()) {
+          router.dismissAll();
+        }
+        router.replace("/(tabs)/chats");
+        setTimeout(() => {
+          router.push(`/(tabs)/chats/${data.groupId}`);
+        }, 0);
       }
     },
   );
