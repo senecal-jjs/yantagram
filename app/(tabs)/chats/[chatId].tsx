@@ -1,6 +1,6 @@
 import * as Crypto from "expo-crypto";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   FlatList,
   KeyboardAvoidingView,
@@ -14,6 +14,7 @@ import {
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 
 import { ChatBubble } from "@/components/chat-bubble";
+import { DeliveryDetailsModal } from "@/components/delivery-details-modal";
 import { BackButton } from "@/components/ui/back-button";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useCredential } from "@/contexts/credential-context";
@@ -21,6 +22,7 @@ import {
   ContactsRepositoryToken,
   GroupMembersRepositoryToken,
   GroupsRepositoryToken,
+  MessageDeliveryRepositoryToken,
   MessagesRepositoryToken,
   useRepos,
 } from "@/contexts/repository-context";
@@ -29,6 +31,10 @@ import { useMessageSender } from "@/hooks/use-message-sender";
 import ContactsRepository, { Contact } from "@/repos/specs/contacts-repository";
 import { GroupMembersRepository } from "@/repos/specs/group-members-repository";
 import GroupsRepository, { Group } from "@/repos/specs/groups-repository";
+import MessageDeliveryRepository, {
+  DeliveryStats,
+  RecipientWithPseudonym,
+} from "@/repos/specs/message-delivery-repository";
 import MessagesRepository from "@/repos/specs/messages-repository";
 import { Message, MessageWithPseudonym } from "@/types/global";
 import { uint8ArrayToHexString } from "@/utils/string";
@@ -47,6 +53,13 @@ export default function Chat() {
   const [groupName, setGroupName] = useState("Unknown Group");
   const [group, setGroup] = useState<Group | null>(null);
   const [groupMembers, setGroupMembers] = useState<Contact[]>([]);
+  const [deliveryStatsMap, setDeliveryStatsMap] = useState<
+    Map<string, DeliveryStats>
+  >(new Map());
+  const [deliveryModalVisible, setDeliveryModalVisible] = useState(false);
+  const [selectedMessageRecipients, setSelectedMessageRecipients] = useState<
+    RecipientWithPseudonym[]
+  >([]);
   const { getRepo } = useRepos();
   const groupsRepo = getRepo<GroupsRepository>(GroupsRepositoryToken);
   const groupMembersRepo = getRepo<GroupMembersRepository>(
@@ -54,7 +67,51 @@ export default function Chat() {
   );
   const contactsRepo = getRepo<ContactsRepository>(ContactsRepositoryToken);
   const messagesRepo = getRepo<MessagesRepository>(MessagesRepositoryToken);
+  const messageDeliveryRepo = getRepo<MessageDeliveryRepository>(
+    MessageDeliveryRepositoryToken,
+  );
   const flatListRef = useRef<FlatList>(null);
+
+  // Fetch delivery stats for messages sent by the current user
+  const fetchDeliveryStats = useCallback(async () => {
+    if (!member) return;
+
+    const myVerificationKey = uint8ArrayToHexString(
+      member.credential.verificationKey,
+    );
+
+    const myMessages = messages.filter(
+      (m) => m.message.sender === myVerificationKey,
+    );
+
+    const statsMap = new Map<string, DeliveryStats>();
+
+    for (const msg of myMessages) {
+      const stats = await messageDeliveryRepo.getDeliveryStats(msg.message.id);
+      if (stats.total > 0) {
+        statsMap.set(msg.message.id, stats);
+      }
+    }
+
+    setDeliveryStatsMap(statsMap);
+  }, [member, messages, messageDeliveryRepo]);
+
+  useEffect(() => {
+    // Only fetch delivery stats for groups with more than 2 members
+    if (groupMembers.length > 1) {
+      fetchDeliveryStats();
+    }
+  }, [messages, groupMembers.length, fetchDeliveryStats]);
+
+  const handleDeliveryPress = useCallback(
+    async (messageId: string) => {
+      const recipients =
+        await messageDeliveryRepo.getReceiptsWithPseudonyms(messageId);
+      setSelectedMessageRecipients(recipients);
+      setDeliveryModalVisible(true);
+    },
+    [messageDeliveryRepo],
+  );
 
   // Process messages with date separators
   const messagesWithSeparators: MessageItem[] = React.useMemo(() => {
@@ -168,6 +225,11 @@ export default function Chat() {
 
     // mark as read, but don't notify listener to prevent re-render loop
     messagesRepo.markAsRead(item.data.message.id, false);
+
+    // Group size includes self + contacts
+    const groupSize = groupMembers.length + 1;
+    const deliveryStats = deliveryStatsMap.get(item.data.message.id);
+
     return (
       <ChatBubble
         message={item.data.message}
@@ -176,6 +238,9 @@ export default function Chat() {
         verificationKey={uint8ArrayToHexString(
           member?.credential.verificationKey!,
         )}
+        groupSize={groupSize}
+        deliveryStats={deliveryStats}
+        onDeliveryPress={handleDeliveryPress}
       />
     );
   };
@@ -314,6 +379,12 @@ export default function Chat() {
             </Pressable>
           </View>
         </KeyboardAvoidingView>
+
+        <DeliveryDetailsModal
+          visible={deliveryModalVisible}
+          onClose={() => setDeliveryModalVisible(false)}
+          recipients={selectedMessageRecipients}
+        />
       </SafeAreaView>
     </SafeAreaProvider>
   );

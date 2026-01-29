@@ -44,6 +44,7 @@ type Message = {
   sender: string;
   contents: string;
   timestamp: number;
+  deliveryStatus?: DeliveryStatus;
 };
 
 type MessageWithPseudonym = {
@@ -69,6 +70,5 @@ export {
   Message,
   MessageWithPseudonym,
   PacketType,
-  Result
+  Result,
 };
-

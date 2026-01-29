@@ -1,4 +1,4 @@
-import { Message, MessageWithPseudonym } from "@/types/global";
+import { DeliveryStatus, Message, MessageWithPseudonym } from "@/types/global";
 import { UUID } from "@/types/utility";
 import * as SQLite from "expo-sqlite";
 import { dbListener } from "../db-listener";
@@ -86,6 +86,7 @@ class SQMessagesRepository implements MessagesRepository, Repository {
         contents: string;
         timestamp: number;
         group_id: string;
+        delivery_status: number;
       }>({ $id: id });
 
       const row = await result.getFirstAsync();
@@ -112,6 +113,7 @@ class SQMessagesRepository implements MessagesRepository, Repository {
         contents: string;
         timestamp: number;
         group_id: string;
+        delivery_status: number;
       }>({ $limit: limit });
 
       const rows = await result.getAllAsync();
@@ -138,6 +140,7 @@ class SQMessagesRepository implements MessagesRepository, Repository {
         contents: string;
         timestamp: number;
         group_id: string;
+        delivery_status: number;
         pseudonym: string | null;
       }>({ $groupId: groupId, $limit: limit, $offset: offset });
 
@@ -219,6 +222,22 @@ class SQMessagesRepository implements MessagesRepository, Repository {
     }
   }
 
+  async updateDeliveryStatus(
+    id: string,
+    status: DeliveryStatus,
+  ): Promise<void> {
+    const statement = await this.db.prepareAsync(
+      "UPDATE messages SET delivery_status = $status WHERE id = $id",
+    );
+
+    try {
+      await statement.executeAsync({ $id: id, $status: status });
+    } finally {
+      await statement.finalizeAsync();
+      dbListener.notifyMessageChange();
+    }
+  }
+
   /**
    * Convert database row to Message object
    */
@@ -228,6 +247,7 @@ class SQMessagesRepository implements MessagesRepository, Repository {
     contents: string;
     timestamp: number;
     group_id: string;
+    delivery_status?: number;
   }): Message {
     return {
       id: row.id,
@@ -235,6 +255,7 @@ class SQMessagesRepository implements MessagesRepository, Repository {
       sender: row.sender,
       contents: row.contents,
       timestamp: row.timestamp,
+      deliveryStatus: row.delivery_status as DeliveryStatus | undefined,
     };
   }
 }

@@ -15,7 +15,7 @@ async function getDB(): Promise<SQLite.SQLiteDatabase> {
 }
 
 async function migrateDb(db: SQLiteDatabase) {
-  const DATABASE_VERSION = 2;
+  const DATABASE_VERSION = 1;
 
   const result = await db.getFirstAsync<{
     user_version: number;
@@ -30,7 +30,7 @@ async function migrateDb(db: SQLiteDatabase) {
   }
 
   if (currentDbVersion === 0) {
-    console.log("migrating");
+    console.log("migrating to v1");
     await db.execAsync(`
       PRAGMA journal_mode = 'wal';
       CREATE TABLE IF NOT EXISTS messages (
@@ -40,6 +40,7 @@ async function migrateDb(db: SQLiteDatabase) {
         timestamp INTEGER NOT NULL,
         group_id TEXT,
         was_read INTEGER NOT NULL DEFAULT 0,
+        delivery_status INTEGER NOT NULL DEFAULT 1,
         FOREIGN KEY (group_id) REFERENCES groups(id) ON DELETE CASCADE
       );
       
@@ -68,6 +69,8 @@ async function migrateDb(db: SQLiteDatabase) {
         contents TEXT NOT NULL,
         timestamp INTEGER NOT NULL,
         group_id TEXT,
+        retry_count INTEGER NOT NULL DEFAULT 0,
+        last_retry_at INTEGER,
         created_at INTEGER NOT NULL DEFAULT (round(unixepoch('subsec') * 1000)),
         FOREIGN KEY (group_id) REFERENCES groups(id) ON DELETE CASCADE
       );
@@ -156,13 +159,7 @@ async function migrateDb(db: SQLiteDatabase) {
       CREATE INDEX idx_connected_devices_device_uuid ON connected_devices(device_uuid);
       CREATE INDEX idx_connected_devices_is_connected ON connected_devices(is_connected);
       CREATE INDEX idx_connected_devices_last_seen_at ON connected_devices(last_seen_at);
-`);
-    currentDbVersion = 1;
-  }
 
-  if (currentDbVersion === 1) {
-    console.log("migrating to version 2 - adding sync_packets table");
-    await db.execAsync(`
       CREATE TABLE IF NOT EXISTS sync_packets (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         packet_id_hex TEXT NOT NULL,
@@ -180,11 +177,25 @@ async function migrateDb(db: SQLiteDatabase) {
       CREATE INDEX idx_sync_packets_category ON sync_packets(category);
       CREATE INDEX idx_sync_packets_timestamp ON sync_packets(timestamp);
       CREATE INDEX idx_sync_packets_created_at ON sync_packets(created_at);
-    `);
-    currentDbVersion = 2;
+
+      CREATE TABLE IF NOT EXISTS message_delivery_receipts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        message_id TEXT NOT NULL,
+        recipient_verification_key TEXT NOT NULL,
+        delivered_at INTEGER,
+        read_at INTEGER,
+        created_at INTEGER NOT NULL DEFAULT (round(unixepoch('subsec') * 1000)),
+        UNIQUE(message_id, recipient_verification_key),
+        FOREIGN KEY (message_id) REFERENCES messages(id) ON DELETE CASCADE
+      );
+
+      CREATE INDEX idx_message_delivery_receipts_message_id ON message_delivery_receipts(message_id);
+      CREATE INDEX idx_message_delivery_receipts_recipient ON message_delivery_receipts(recipient_verification_key);
+`);
+    currentDbVersion = 1;
   }
 
-  // if (currentDbVersion === 2) {
+  // if (currentDbVersion === 1) {
   //   Add more migrations
   // }
   await db.execAsync(`PRAGMA user_version = ${DATABASE_VERSION}`);

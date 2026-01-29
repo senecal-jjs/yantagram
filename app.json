@@ -83,7 +83,8 @@
     },
     "extra": {
       "ble": {
-        "outgoingMessageRetryIntervalSeconds": 30,
+        "outgoingMessageRetryIntervalSeconds": 360,
+        "outgoingMessageRetryMaxAttempts": 10,
         "mtuLimitBytes": 512,
         "defaultFragmentSizeBytes": 469
       },

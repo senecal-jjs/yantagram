@@ -6,16 +6,25 @@ import {
 import { UpdateMessage, WelcomeMessage } from "@/amigo/types";
 import { useCredentials } from "@/contexts/credential-context";
 import {
+  ContactsRepositoryToken,
+  GroupMembersRepositoryToken,
+  MessageDeliveryRepositoryToken,
   MessagesRepositoryToken,
   OutgoingMessagesRepositoryToken,
   useRepos,
 } from "@/contexts/repository-context";
 import BleModule from "@/modules/ble/src/BleModule";
+import ContactsRepository from "@/repos/specs/contacts-repository";
+import { GroupMembersRepository } from "@/repos/specs/group-members-repository";
+import MessageDeliveryRepository from "@/repos/specs/message-delivery-repository";
 import MessagesRepository from "@/repos/specs/messages-repository";
 import OutgoingMessagesRepository from "@/repos/specs/outgoing-messages-repository";
 import { fragmentPayload } from "@/services/frag-service";
 import { toBinaryPayload } from "@/services/message-protocol-service";
-import { encode } from "@/services/packet-protocol-service";
+import {
+  encode,
+  serializeDeliveryAck,
+} from "@/services/packet-protocol-service";
 import {
   BitchatPacket,
   FragmentType,
@@ -23,6 +32,7 @@ import {
   PacketType,
 } from "@/types/global";
 import { sleep } from "@/utils/sleep";
+import { uint8ArrayToHexString } from "@/utils/string";
 import Constants from "expo-constants";
 
 export function useMessageSender() {
@@ -32,6 +42,13 @@ export function useMessageSender() {
     OutgoingMessagesRepositoryToken,
   );
   const messagesRepo = getRepo<MessagesRepository>(MessagesRepositoryToken);
+  const groupMembersRepo = getRepo<GroupMembersRepository>(
+    GroupMembersRepositoryToken,
+  );
+  const contactsRepo = getRepo<ContactsRepository>(ContactsRepositoryToken);
+  const messageDeliveryRepo = getRepo<MessageDeliveryRepository>(
+    MessageDeliveryRepositoryToken,
+  );
 
   const sendMessage = async (message: Message) => {
     if (!member) {
@@ -51,6 +68,30 @@ export function useMessageSender() {
       message.contents,
       message.timestamp,
     );
+
+    // Create delivery receipts for all group members (excluding self)
+    const myVerificationKey = uint8ArrayToHexString(
+      member.credential.verificationKey,
+    );
+    const groupMembers = await groupMembersRepo.getByGroup(message.groupId);
+    const recipientKeys: string[] = [];
+
+    for (const gm of groupMembers) {
+      const contact = await contactsRepo.get(gm.contactId);
+      if (contact) {
+        const contactKey = uint8ArrayToHexString(contact.verificationKey);
+        if (contactKey !== myVerificationKey) {
+          recipientKeys.push(contactKey);
+        }
+      }
+    }
+
+    if (recipientKeys.length > 0) {
+      await messageDeliveryRepo.createReceiptsForMessage(
+        message.id,
+        recipientKeys,
+      );
+    }
 
     // Attempt immediate broadcast (foreground)
     const payload = toBinaryPayload(message);
@@ -152,5 +193,50 @@ export function useMessageSender() {
     }
   };
 
-  return { sendMessage, sendAmigoWelcome, sendAmigoPathUpdate };
+  return {
+    sendMessage,
+    sendAmigoWelcome,
+    sendAmigoPathUpdate,
+    sendDeliveryAck,
+  };
+
+  /**
+   * Broadcast a delivery acknowledgement for a received message.
+   * This notifies the sender that the message was successfully delivered.
+   */
+  async function sendDeliveryAck(messageId: string): Promise<void> {
+    if (!member) {
+      throw new Error("Member state missing for sending delivery ACK");
+    }
+
+    const myVerificationKey = uint8ArrayToHexString(
+      member.credential.verificationKey,
+    );
+
+    const ackPayload = serializeDeliveryAck({
+      messageId,
+      senderVerificationKey: myVerificationKey,
+      timestamp: Date.now(),
+    });
+
+    const packet: BitchatPacket = {
+      version: 1,
+      type: PacketType.DELIVERY_ACK,
+      timestamp: Date.now(),
+      payload: ackPayload,
+      allowedHops: 3,
+    };
+
+    const encoded = encode(packet);
+
+    if (!encoded) {
+      throw new Error("Failed to encode delivery ACK packet");
+    }
+
+    try {
+      await BleModule.broadcastPacketAsync(encoded, []);
+    } catch (error) {
+      console.error("[DeliveryAck] Failed to broadcast:", error);
+    }
+  }
 }

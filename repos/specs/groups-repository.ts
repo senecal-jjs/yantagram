@@ -11,7 +11,12 @@ export interface Group {
 }
 
 export default interface GroupsRepository {
-  create(id: UUID, name: string, asAdmin: boolean, expandable?: boolean): Promise<Group>;
+  create(
+    id: UUID,
+    name: string,
+    asAdmin: boolean,
+    expandable?: boolean,
+  ): Promise<Group>;
   get(id: UUID): Promise<Group | null>;
   getByName(name: string): Promise<Group | null>;
   list(): Promise<Group[]>;

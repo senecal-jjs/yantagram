@@ -13,9 +13,11 @@ import { RepositoryProvider } from "@/contexts/repository-context";
 import { SettingsProvider } from "@/contexts/settings-context";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useMessageRetention } from "@/hooks/use-message-retention";
+import { useMessageRetry } from "@/hooks/use-message-retry";
 import { useRelayWorker } from "@/hooks/use-relay-worker";
 import { migrateDb } from "@/repos/db";
 import { Buffer } from "buffer";
+import * as SQLite from "expo-sqlite";
 import { SQLiteProvider } from "expo-sqlite";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import "react-native-get-random-values";
@@ -35,8 +37,20 @@ function BackgroundTasks({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+/**
+ * Component that runs background tasks requiring credential context access
+ */
+function CredentialBackgroundTasks({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  useMessageRetry();
+  return <>{children}</>;
+}
+
 export default function RootLayout() {
-  // SQLite.deleteDatabaseAsync("bitchat.db");
+  SQLite.deleteDatabaseAsync("bitchat.db");
   const colorScheme = useColorScheme();
 
   return (
@@ -47,27 +61,38 @@ export default function RootLayout() {
             <RepositoryProvider>
               <BackgroundTasks>
                 <CredentialProvider>
-                  <GroupCreationProvider>
-                    <Stack>
-                      <Stack.Screen
-                        name="(tabs)"
-                        options={{ headerShown: false }}
-                      />
-                      <Stack.Screen
-                        name="(group-modal)"
-                        options={{ presentation: "modal", headerShown: false }}
-                      />
-                      <Stack.Screen
-                        name="(group-manager-modal)"
-                        options={{ presentation: "modal", headerShown: false }}
-                      ></Stack.Screen>
-                      <Stack.Screen
-                        name="(settings-modal)"
-                        options={{ presentation: "modal", headerShown: false }}
-                      ></Stack.Screen>
-                    </Stack>
-                    <StatusBar style="auto" />
-                  </GroupCreationProvider>
+                  <CredentialBackgroundTasks>
+                    <GroupCreationProvider>
+                      <Stack>
+                        <Stack.Screen
+                          name="(tabs)"
+                          options={{ headerShown: false }}
+                        />
+                        <Stack.Screen
+                          name="(group-modal)"
+                          options={{
+                            presentation: "modal",
+                            headerShown: false,
+                          }}
+                        />
+                        <Stack.Screen
+                          name="(group-manager-modal)"
+                          options={{
+                            presentation: "modal",
+                            headerShown: false,
+                          }}
+                        ></Stack.Screen>
+                        <Stack.Screen
+                          name="(settings-modal)"
+                          options={{
+                            presentation: "modal",
+                            headerShown: false,
+                          }}
+                        ></Stack.Screen>
+                      </Stack>
+                      <StatusBar style="auto" />
+                    </GroupCreationProvider>
+                  </CredentialBackgroundTasks>
                 </CredentialProvider>
               </BackgroundTasks>
             </RepositoryProvider>
