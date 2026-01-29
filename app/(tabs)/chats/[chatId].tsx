@@ -1,5 +1,5 @@
 import * as Crypto from "expo-crypto";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   FlatList,
@@ -17,6 +17,7 @@ import { ChatBubble } from "@/components/chat-bubble";
 import { DeliveryDetailsModal } from "@/components/delivery-details-modal";
 import { BackButton } from "@/components/ui/back-button";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { useActiveChat } from "@/contexts/active-chat-context";
 import { useCredential } from "@/contexts/credential-context";
 import {
   ContactsRepositoryToken,
@@ -48,6 +49,7 @@ export default function Chat() {
   const { chatId } = useLocalSearchParams<{ chatId: string }>();
   const { member } = useCredential();
   const { sendMessage } = useMessageSender();
+  const { setActiveChat } = useActiveChat();
   const { messages, isLoading, isLoadingMore, hasMore, loadMore } =
     useGroupMessages(chatId);
   const [groupName, setGroupName] = useState("Unknown Group");
@@ -71,6 +73,19 @@ export default function Chat() {
     MessageDeliveryRepositoryToken,
   );
   const flatListRef = useRef<FlatList>(null);
+
+  // Track active chat for notification suppression
+  useFocusEffect(
+    useCallback(() => {
+      // Set this chat as active when screen is focused
+      setActiveChat(chatId);
+
+      // Clear active chat when screen loses focus
+      return () => {
+        setActiveChat(null);
+      };
+    }, [chatId, setActiveChat]),
+  );
 
   // Fetch delivery stats for messages sent by the current user
   const fetchDeliveryStats = useCallback(async () => {

@@ -7,18 +7,22 @@ import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import "react-native-reanimated";
 
+import { ActiveChatProvider } from "@/contexts/active-chat-context";
 import { CredentialProvider } from "@/contexts/credential-context";
 import { GroupCreationProvider } from "@/contexts/group-creation-context";
 import { RepositoryProvider } from "@/contexts/repository-context";
-import { SettingsProvider } from "@/contexts/settings-context";
+import { SettingsProvider, useSettings } from "@/contexts/settings-context";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useMessageRetention } from "@/hooks/use-message-retention";
 import { useMessageRetry } from "@/hooks/use-message-retry";
+import { useNotifications } from "@/hooks/use-notifications";
 import { useRelayWorker } from "@/hooks/use-relay-worker";
 import { migrateDb } from "@/repos/db";
+import { setNotificationsEnabled } from "@/services/notification-service";
 import { Buffer } from "buffer";
 import * as SQLite from "expo-sqlite";
 import { SQLiteProvider } from "expo-sqlite";
+import { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import "react-native-get-random-values";
 
@@ -34,6 +38,14 @@ export const unstable_settings = {
 function BackgroundTasks({ children }: { children: React.ReactNode }) {
   useMessageRetention();
   useRelayWorker();
+  useNotifications();
+
+  // Sync notification setting to the notification service
+  const { settings } = useSettings();
+  useEffect(() => {
+    setNotificationsEnabled(settings.notificationsEnabled);
+  }, [settings.notificationsEnabled]);
+
   return <>{children}</>;
 }
 
@@ -62,36 +74,38 @@ export default function RootLayout() {
               <BackgroundTasks>
                 <CredentialProvider>
                   <CredentialBackgroundTasks>
-                    <GroupCreationProvider>
-                      <Stack>
-                        <Stack.Screen
-                          name="(tabs)"
-                          options={{ headerShown: false }}
-                        />
-                        <Stack.Screen
-                          name="(group-modal)"
-                          options={{
-                            presentation: "modal",
-                            headerShown: false,
-                          }}
-                        />
-                        <Stack.Screen
-                          name="(group-manager-modal)"
-                          options={{
-                            presentation: "modal",
-                            headerShown: false,
-                          }}
-                        ></Stack.Screen>
-                        <Stack.Screen
-                          name="(settings-modal)"
-                          options={{
-                            presentation: "modal",
-                            headerShown: false,
-                          }}
-                        ></Stack.Screen>
-                      </Stack>
-                      <StatusBar style="auto" />
-                    </GroupCreationProvider>
+                    <ActiveChatProvider>
+                      <GroupCreationProvider>
+                        <Stack>
+                          <Stack.Screen
+                            name="(tabs)"
+                            options={{ headerShown: false }}
+                          />
+                          <Stack.Screen
+                            name="(group-modal)"
+                            options={{
+                              presentation: "modal",
+                              headerShown: false,
+                            }}
+                          />
+                          <Stack.Screen
+                            name="(group-manager-modal)"
+                            options={{
+                              presentation: "modal",
+                              headerShown: false,
+                            }}
+                          ></Stack.Screen>
+                          <Stack.Screen
+                            name="(settings-modal)"
+                            options={{
+                              presentation: "modal",
+                              headerShown: false,
+                            }}
+                          ></Stack.Screen>
+                        </Stack>
+                        <StatusBar style="auto" />
+                      </GroupCreationProvider>
+                    </ActiveChatProvider>
                   </CredentialBackgroundTasks>
                 </CredentialProvider>
               </BackgroundTasks>

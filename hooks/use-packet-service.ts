@@ -41,6 +41,10 @@ import {
   GossipSyncDelegate,
 } from "@/services/gossip-sync-manager";
 import { fromBinaryPayload } from "@/services/message-protocol-service";
+import {
+  shouldShowNotification,
+  showMessageNotification,
+} from "@/services/notification-service";
 import { packetQueue } from "@/services/packet-processor-queue";
 import * as PacketProtocolService from "@/services/packet-protocol-service";
 import {
@@ -413,6 +417,41 @@ export function usePacketService() {
           );
           if (message.sender !== myVerificationKey) {
             sendDeliveryAck(message.id);
+
+            // Show notification for incoming messages
+            if (shouldShowNotification(message.groupId)) {
+              try {
+                // Look up sender pseudonym from contacts
+                const senderKeyBytes = Buffer.from(message.sender, "hex");
+                const senderContact =
+                  await contactsRepository.getByVerificationKey(senderKeyBytes);
+                const senderPseudonym =
+                  senderContact?.pseudonym ?? "Unknown sender";
+
+                // Look up group name
+                const group = await groupsRepository.get(message.groupId);
+                const groupName = group?.name ?? "Unknown chat";
+
+                // Truncate message for preview
+                const messagePreview =
+                  message.contents.length > 100
+                    ? message.contents.substring(0, 100) + "..."
+                    : message.contents;
+
+                await showMessageNotification({
+                  messageId: message.id,
+                  groupId: message.groupId,
+                  senderPseudonym,
+                  groupName,
+                  messagePreview,
+                });
+              } catch (notifError) {
+                console.error(
+                  "[PacketService] Failed to show notification:",
+                  notifError,
+                );
+              }
+            }
           }
         }
       });
