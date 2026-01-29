@@ -223,6 +223,11 @@ export default function StartSettingsScreen() {
               styles.preferenceItemBottom,
               pressed && styles.itemPressed,
             ]}
+            onPress={() =>
+              router.navigate({
+                pathname: "/(settings-modal)/notifications",
+              })
+            }
           >
             <View style={styles.preferenceContent}>
               <Text style={styles.buttonText}>Notifications</Text>

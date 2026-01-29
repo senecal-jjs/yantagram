@@ -18,7 +18,10 @@ import { useMessageRetry } from "@/hooks/use-message-retry";
 import { useNotifications } from "@/hooks/use-notifications";
 import { useRelayWorker } from "@/hooks/use-relay-worker";
 import { migrateDb } from "@/repos/db";
-import { setNotificationsEnabled } from "@/services/notification-service";
+import {
+  setNotificationContentOption,
+  setNotificationsEnabled,
+} from "@/services/notification-service";
 import { Buffer } from "buffer";
 import * as SQLite from "expo-sqlite";
 import { SQLiteProvider } from "expo-sqlite";
@@ -40,11 +43,15 @@ function BackgroundTasks({ children }: { children: React.ReactNode }) {
   useRelayWorker();
   useNotifications();
 
-  // Sync notification setting to the notification service
+  // Sync notification settings to the notification service
   const { settings } = useSettings();
   useEffect(() => {
     setNotificationsEnabled(settings.notificationsEnabled);
   }, [settings.notificationsEnabled]);
+
+  useEffect(() => {
+    setNotificationContentOption(settings.notificationContent);
+  }, [settings.notificationContent]);
 
   return <>{children}</>;
 }

@@ -35,6 +35,9 @@ let notificationsEnabled = true;
 // Track if app is in foreground (device unlocked and app visible)
 let isAppInForeground = true;
 
+// Track notification content preference
+let notificationContentOption: "nameOnly" | "nameAndContent" = "nameAndContent";
+
 // Callback to get unread message count from repository
 let getUnreadCountCallback: (() => Promise<number>) | null = null;
 
@@ -86,6 +89,16 @@ export function setNotificationsEnabled(enabled: boolean): void {
  */
 export function setAppForegroundState(inForeground: boolean): void {
   isAppInForeground = inForeground;
+}
+
+/**
+ * Update the notification content setting.
+ * @param option - "nameOnly" shows only sender name, "nameAndContent" shows name and message preview
+ */
+export function setNotificationContentOption(
+  option: "nameOnly" | "nameAndContent",
+): void {
+  notificationContentOption = option;
 }
 
 /**
@@ -154,9 +167,16 @@ export async function showMessageNotification(
   // Determine title based on whether it's a group or 1:1 chat
   const isGroupChat = groupName !== senderPseudonym;
   const title = isGroupChat ? groupName : senderPseudonym;
-  const body = isGroupChat
-    ? `${senderPseudonym}: ${messagePreview}`
-    : messagePreview;
+
+  // Determine body based on notification content setting
+  let body: string;
+  if (notificationContentOption === "nameOnly") {
+    body = "New message";
+  } else {
+    body = isGroupChat
+      ? `${senderPseudonym}: ${messagePreview}`
+      : messagePreview;
+  }
 
   await Notifications.scheduleNotificationAsync({
     content: {
@@ -222,7 +242,7 @@ export function setupNotificationResponseHandler(): () => void {
 
       if (data?.type === "message" && data?.groupId) {
         // Navigate to the chat
-        router.push(`/(tabs)/chats/${data.groupId}`);
+        router.dismissTo(`/(tabs)/chats/${data.groupId}`);
       }
     },
   );

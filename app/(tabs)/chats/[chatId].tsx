@@ -363,7 +363,10 @@ export default function Chat() {
                 : `separator-${item.timestamp}-${index}`
             }
             onContentSizeChange={() => {
-              flatListRef.current?.scrollToEnd({ animated: true });
+              // Delay scroll to ensure layout is complete after input height changes
+              setTimeout(() => {
+                flatListRef.current?.scrollToEnd({ animated: true });
+              }, 100);
             }}
             onLayout={() => {
               flatListRef.current?.scrollToEnd({ animated: true });
@@ -375,7 +378,7 @@ export default function Chat() {
             maintainVisibleContentPosition={{
               minIndexForVisible: 0,
             }}
-            contentContainerStyle={{ paddingRight: 5 }}
+            contentContainerStyle={{ paddingRight: 5, paddingBottom: 10 }}
           />
           <View style={styles.inputContainer}>
             <TextInput

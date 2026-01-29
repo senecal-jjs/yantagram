@@ -37,6 +37,14 @@ export default function ModalLayout() {
           animation: "slide_from_right",
         }}
       ></Stack.Screen>
+      <Stack.Screen
+        name="notifications"
+        options={{
+          headerShown: false,
+          presentation: "card",
+          animation: "slide_from_right",
+        }}
+      ></Stack.Screen>
     </Stack>
   );
 }
