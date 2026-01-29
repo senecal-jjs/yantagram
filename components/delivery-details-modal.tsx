@@ -1,12 +1,12 @@
 import { RecipientWithPseudonym } from "@/repos/specs/message-delivery-repository";
 import React from "react";
 import {
-    FlatList,
-    Modal,
-    Pressable,
-    StyleSheet,
-    Text,
-    View,
+  FlatList,
+  Modal,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
 
 interface DeliveryDetailsModalProps {

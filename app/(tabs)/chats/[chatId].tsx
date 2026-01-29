@@ -51,7 +51,7 @@ export default function Chat() {
   const { member } = useCredential();
   const { sendMessage } = useMessageSender();
   const { setActiveChat } = useActiveChat();
-  const { messages, isLoading, isLoadingMore, hasMore, loadMore } =
+  const { messages, isLoadingMore, hasMore, loadMore } =
     useGroupMessages(chatId);
   const [groupName, setGroupName] = useState("Unknown Group");
   const [group, setGroup] = useState<Group | null>(null);

@@ -1,13 +1,13 @@
 import {
-    clearNotificationsForGroup,
-    setActiveChatId as setActiveChatIdInService,
+  clearNotificationsForGroup,
+  setActiveChatId as setActiveChatIdInService,
 } from "@/services/notification-service";
 import React, {
-    createContext,
-    ReactNode,
-    useCallback,
-    useContext,
-    useState,
+  createContext,
+  ReactNode,
+  useCallback,
+  useContext,
+  useState,
 } from "react";
 
 interface ActiveChatContextType {

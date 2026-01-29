@@ -1,8 +1,8 @@
 import {
-    requestNotificationPermissions,
-    setAppForegroundState,
-    setupNotificationResponseHandler,
-    syncBadgeWithUnreadCount,
+  requestNotificationPermissions,
+  setAppForegroundState,
+  setupNotificationResponseHandler,
+  syncBadgeWithUnreadCount,
 } from "@/services/notification-service";
 import { useEffect, useRef, useState } from "react";
 import { AppState, AppStateStatus } from "react-native";

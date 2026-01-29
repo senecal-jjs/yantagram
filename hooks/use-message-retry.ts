@@ -1,12 +1,12 @@
 import { serializeEncryptedMessage } from "@/amigo/protocol";
 import { useCredentials } from "@/contexts/credential-context";
 import {
-    OutgoingMessagesRepositoryToken,
-    useRepos,
+  OutgoingMessagesRepositoryToken,
+  useRepos,
 } from "@/contexts/repository-context";
 import BleModule from "@/modules/ble/src/BleModule";
 import OutgoingMessagesRepository, {
-    OutgoingMessage,
+  OutgoingMessage,
 } from "@/repos/specs/outgoing-messages-repository";
 import { fragmentPayload } from "@/services/frag-service";
 import { toBinaryPayload } from "@/services/message-protocol-service";
