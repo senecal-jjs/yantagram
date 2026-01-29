@@ -252,7 +252,7 @@ export default function StartSettingsScreen() {
             router.navigate({ pathname: "/(settings-modal)/security-privacy" })
           }
         >
-          <Text style={styles.buttonText}>Security & Privacy</Text>
+          <Text style={styles.buttonText}>Features</Text>
           <IconSymbol name="chevron.right" color="white" size={15}></IconSymbol>
         </Pressable>
 
