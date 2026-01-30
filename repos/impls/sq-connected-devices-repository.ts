@@ -168,6 +168,26 @@ class SQConnectedDevicesRepository
     }
   }
 
+  async touch(deviceUUID: string): Promise<void> {
+    const statement = await this.db.prepareAsync(
+      `UPDATE connected_devices 
+       SET last_seen_at = $lastSeenAt, updated_at = $updatedAt
+       WHERE device_uuid = $deviceUUID`,
+    );
+
+    const now = Date.now();
+
+    try {
+      await statement.executeAsync({
+        $deviceUUID: deviceUUID,
+        $lastSeenAt: now,
+        $updatedAt: now,
+      });
+    } finally {
+      await statement.finalizeAsync();
+    }
+  }
+
   async delete(deviceUUID: string): Promise<void> {
     const statement = await this.db.prepareAsync(
       "DELETE FROM connected_devices WHERE device_uuid = $deviceUUID",
@@ -187,20 +207,6 @@ class SQConnectedDevicesRepository
 
     try {
       await statement.executeAsync();
-    } finally {
-      await statement.finalizeAsync();
-    }
-  }
-
-  async deleteStale(olderThanMs: number): Promise<number> {
-    const cutoff = Date.now() - olderThanMs;
-    const statement = await this.db.prepareAsync(
-      "DELETE FROM connected_devices WHERE last_seen_at < $cutoff",
-    );
-
-    try {
-      const result = await statement.executeAsync({ $cutoff: cutoff });
-      return result.changes;
     } finally {
       await statement.finalizeAsync();
     }

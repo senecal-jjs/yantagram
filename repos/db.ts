@@ -191,6 +191,16 @@ async function migrateDb(db: SQLiteDatabase) {
 
       CREATE INDEX idx_message_delivery_receipts_message_id ON message_delivery_receipts(message_id);
       CREATE INDEX idx_message_delivery_receipts_recipient ON message_delivery_receipts(recipient_verification_key);
+
+      CREATE TABLE IF NOT EXISTS pending_decryption_messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        encrypted_payload BLOB NOT NULL,
+        payload_hash INTEGER NOT NULL,
+        created_at INTEGER NOT NULL DEFAULT (round(unixepoch('subsec') * 1000))
+      );
+
+      CREATE INDEX idx_pending_decryption_messages_payload_hash ON pending_decryption_messages(payload_hash);
+      CREATE INDEX idx_pending_decryption_messages_created_at ON pending_decryption_messages(created_at);
 `);
     currentDbVersion = 1;
   }

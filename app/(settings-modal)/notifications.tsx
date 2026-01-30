@@ -1,7 +1,7 @@
 import { BackButton } from "@/components/ui/back-button";
 import {
-    NotificationContentOption,
-    useSettings,
+  NotificationContentOption,
+  useSettings,
 } from "@/contexts/settings-context";
 import { useRouter } from "expo-router";
 import { Pressable, StyleSheet, Switch, Text, View } from "react-native";
