@@ -97,7 +97,7 @@
         "defaultFragmentSizeBytes": 469
       },
       "decryption": {
-        "pendingMessageRetentionSeconds": 86400 // 1 day
+        "pendingMessageRetentionSeconds": 86400 
       },
       "router": {},
       "eas": {
