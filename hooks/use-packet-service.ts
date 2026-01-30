@@ -15,6 +15,7 @@ import {
   MessageDeliveryRepositoryToken,
   MessagesRepositoryToken,
   OutgoingMessagesRepositoryToken,
+  PendingDecryptionRepositoryToken,
   RelayPacketsRepositoryToken,
   SyncPacketsRepositoryToken,
   useRepos,
@@ -29,6 +30,7 @@ import IncomingPacketsRepository from "@/repos/specs/incoming-packets-repository
 import MessageDeliveryRepository from "@/repos/specs/message-delivery-repository";
 import MessagesRepository from "@/repos/specs/messages-repository";
 import OutgoingMessagesRepository from "@/repos/specs/outgoing-messages-repository";
+import PendingDecryptionRepository from "@/repos/specs/pending-decryption-repository";
 import RelayPacketsRepository from "@/repos/specs/relay-packets-repository";
 import SyncPacketsRepository from "@/repos/specs/sync-packets-repository";
 import {
@@ -60,6 +62,7 @@ import {
 } from "@/types/global";
 import { Mutex } from "@/utils/mutex";
 import { uint8ArrayToHexString } from "@/utils/string";
+import Constants from "expo-constants";
 import { useEffect } from "react";
 import { useMessageSender } from "./use-message-sender";
 import { useTTLBloomFilter } from "./use-ttl-bloom-filter";
@@ -97,9 +100,17 @@ export function usePacketService() {
   const outgoingMessagesRepository = getRepo<OutgoingMessagesRepository>(
     OutgoingMessagesRepositoryToken,
   );
+  const pendingDecryptionRepository = getRepo<PendingDecryptionRepository>(
+    PendingDecryptionRepositoryToken,
+  );
   const { member, saveMember } = useCredentials();
   const { sendAmigoPathUpdate, sendDeliveryAck } = useMessageSender();
   const syncManager = getGossipSyncManager();
+
+  // Get pending message retention from config (default 1 hour)
+  const pendingMessageRetentionSeconds =
+    (Constants.expoConfig?.extra?.decryption
+      ?.pendingMessageRetentionSeconds as number) ?? 3600;
   const mutex = new Mutex();
 
   // Set up queue processor
@@ -356,6 +367,7 @@ export function usePacketService() {
     }
 
     const pathUpdate = deserializeUpdateMessage(pathUpdateBytes);
+    let pathApplied = false;
 
     for (const groupName of member.getGroupNames()) {
       try {
@@ -365,24 +377,90 @@ export function usePacketService() {
           groupName,
         );
         saveMember();
+        pathApplied = true;
       } catch (error) {
         console.log(error);
       }
     }
+
+    // After applying a path update, retry decryption of pending messages
+    if (pathApplied) {
+      await retryPendingDecryption();
+    }
   };
 
-  const handleAmigoMessage = async (encryptedBytes: Uint8Array) => {
-    if (!member) {
-      throw new Error("Member state missing");
-    }
+  /**
+   * Process a successfully decrypted message: save to repository, send ACK, show notification.
+   * This helper consolidates the common logic between handleAmigoMessage and retryPendingDecryption.
+   */
+  const processDecryptedMessage = async (messageBytes: Uint8Array) => {
+    if (!member) return;
 
-    console.log(`${member.pseudonym} received amigo message`);
+    const message = fromBinaryPayload(messageBytes);
+    await mutex.runExclusive(async () => {
+      const messageExists = await messagesRepository.exists(message.id);
+      if (!messageExists) {
+        await messagesRepository.create(
+          message.id,
+          message.groupId,
+          message.sender,
+          message.contents,
+          message.timestamp,
+        );
+
+        // Send delivery ACK for messages not sent by ourselves
+        const myVerificationKey = uint8ArrayToHexString(
+          member.credential.verificationKey,
+        );
+        if (message.sender !== myVerificationKey) {
+          sendDeliveryAck(message.id);
+
+          // Show notification for incoming messages
+          if (shouldShowNotification(message.groupId)) {
+            try {
+              const senderKeyBytes = Buffer.from(message.sender, "hex");
+              const senderContact =
+                await contactsRepository.getByVerificationKey(senderKeyBytes);
+              const senderPseudonym =
+                senderContact?.pseudonym ?? "Unknown sender";
+              const group = await groupsRepository.get(message.groupId);
+              const groupName = group?.name ?? "Unknown chat";
+              const messagePreview =
+                message.contents.length > 100
+                  ? message.contents.substring(0, 100) + "..."
+                  : message.contents;
+
+              await showMessageNotification({
+                messageId: message.id,
+                groupId: message.groupId,
+                senderPseudonym,
+                groupName,
+                messagePreview,
+              });
+
+              await syncBadgeWithUnreadCount();
+            } catch (notifError) {
+              console.error(
+                "[PacketService] Failed to show notification:",
+                notifError,
+              );
+            }
+          }
+        }
+      }
+    });
+  };
+
+  /**
+   * Attempt to decrypt an encrypted message against all known groups.
+   * Returns the decrypted message bytes if successful, null otherwise.
+   */
+  const attemptDecryption = async (
+    encryptedBytes: Uint8Array,
+  ): Promise<Uint8Array | null> => {
+    if (!member) return null;
 
     const encryptedMessage = deserializeEncryptedMessage(encryptedBytes);
-
-    // it's possible the member's async cryptographic state isn't up to date.
-    // if decryption is unsuccessful, the message should be saved and decryption attempted
-    // at a later date
     let messageBytes: Uint8Array | null = null;
 
     for (const groupName of member.getGroupNames()) {
@@ -394,73 +472,83 @@ export function usePacketService() {
           encryptedMessage.messageCounter,
         );
         saveMember();
-      } catch (error) {
-        console.log(error);
+        break; // Successfully decrypted
+      } catch {
+        // Try next group
       }
     }
 
-    if (messageBytes) {
-      const message = fromBinaryPayload(messageBytes);
-      await mutex.runExclusive(async () => {
-        const messageExists = await messagesRepository.exists(message.id);
-        if (!messageExists) {
-          await messagesRepository.create(
-            message.id,
-            message.groupId,
-            message.sender,
-            message.contents,
-            message.timestamp,
+    return messageBytes;
+  };
+
+  /**
+   * Retry decryption of stored pending messages.
+   * Called after a path update is successfully applied.
+   */
+  const retryPendingDecryption = async () => {
+    if (!member) return;
+
+    const pendingMessages = await pendingDecryptionRepository.getAll();
+    if (pendingMessages.length === 0) return;
+
+    console.log(
+      `[PacketService] Retrying decryption for ${pendingMessages.length} pending messages`,
+    );
+
+    for (const pending of pendingMessages) {
+      try {
+        const messageBytes = await attemptDecryption(pending.encryptedPayload);
+
+        if (messageBytes) {
+          console.log(
+            `[PacketService] Successfully decrypted pending message ${pending.id}`,
           );
-
-          // Send delivery ACK for messages not sent by ourselves
-          const myVerificationKey = uint8ArrayToHexString(
-            member.credential.verificationKey,
-          );
-          if (message.sender !== myVerificationKey) {
-            sendDeliveryAck(message.id);
-
-            // Show notification for incoming messages
-            if (shouldShowNotification(message.groupId)) {
-              try {
-                // Look up sender pseudonym from contacts
-                const senderKeyBytes = Buffer.from(message.sender, "hex");
-                const senderContact =
-                  await contactsRepository.getByVerificationKey(senderKeyBytes);
-                const senderPseudonym =
-                  senderContact?.pseudonym ?? "Unknown sender";
-
-                // Look up group name
-                const group = await groupsRepository.get(message.groupId);
-                const groupName = group?.name ?? "Unknown chat";
-
-                // Truncate message for preview
-                const messagePreview =
-                  message.contents.length > 100
-                    ? message.contents.substring(0, 100) + "..."
-                    : message.contents;
-
-                await showMessageNotification({
-                  messageId: message.id,
-                  groupId: message.groupId,
-                  senderPseudonym,
-                  groupName,
-                  messagePreview,
-                });
-
-                // Sync badge with unread count
-                await syncBadgeWithUnreadCount();
-              } catch (notifError) {
-                console.error(
-                  "[PacketService] Failed to show notification:",
-                  notifError,
-                );
-              }
-            }
-          }
+          await pendingDecryptionRepository.delete(pending.id);
+          await processDecryptedMessage(messageBytes);
         }
-      });
+      } catch (error) {
+        console.log(
+          `[PacketService] Retry decryption failed for pending ${pending.id}:`,
+          error,
+        );
+      }
+    }
+
+    // Clean up old pending messages
+    const deletedCount = await pendingDecryptionRepository.deleteOlderThan(
+      pendingMessageRetentionSeconds,
+    );
+    if (deletedCount > 0) {
+      console.log(
+        `[PacketService] Cleaned up ${deletedCount} expired pending messages`,
+      );
+    }
+  };
+
+  const handleAmigoMessage = async (encryptedBytes: Uint8Array) => {
+    if (!member) {
+      throw new Error("Member state missing");
+    }
+
+    console.log(`${member.pseudonym} received amigo message`);
+
+    // Attempt decryption across all groups
+    const messageBytes = await attemptDecryption(encryptedBytes);
+
+    if (messageBytes) {
+      await processDecryptedMessage(messageBytes);
     } else {
-      console.warn("Failed to decrypt message, save for future attempt");
+      console.warn(
+        "[PacketService] Failed to decrypt message, storing for future retry",
+      );
+      // Store the encrypted message for later decryption attempt
+      try {
+        await pendingDecryptionRepository.create(encryptedBytes);
+        console.log("[PacketService] Stored pending decryption message");
+      } catch {
+        // Ignore duplicate errors
+        console.log("[PacketService] Message already pending or store failed");
+      }
     }
   };
 

@@ -96,6 +96,9 @@
         "mtuLimitBytes": 512,
         "defaultFragmentSizeBytes": 469
       },
+      "decryption": {
+        "pendingMessageRetentionSeconds": 86400 // 1 day
+      },
       "router": {},
       "eas": {
         "projectId": "796de80a-5582-46fb-94ef-4ef656b5c02d"
