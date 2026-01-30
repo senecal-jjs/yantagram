@@ -182,8 +182,8 @@ describe("TreeKEM Member Tests", () => {
 
         // Test encryption/decryption with node keys
         const message = new Uint8Array(32).fill(5);
-        const { ciphertext, newPublicKey } = node.publicKey!.encrypt(message);
-        const { message: decryptedMessage, newSecretKey } =
+        const { ciphertext } = node.publicKey!.encrypt(message);
+        const { message: decryptedMessage } =
           node.privateKey!.decrypt(ciphertext);
         expect(decryptedMessage).toEqual(message);
 

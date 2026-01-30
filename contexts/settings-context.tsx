@@ -1,15 +1,18 @@
 import { fetchFromFile, saveToAppDirectory } from "@/utils/file";
 import React, {
-    createContext,
-    ReactNode,
-    useContext,
-    useEffect,
-    useState,
+  createContext,
+  ReactNode,
+  useContext,
+  useEffect,
+  useState,
 } from "react";
+
+export type NotificationContentOption = "nameOnly" | "nameAndContent";
 
 interface Settings {
   messageRetentionMinutes: number;
   notificationsEnabled: boolean;
+  notificationContent: NotificationContentOption;
   theme: "dark" | "light" | "auto";
   autoDeleteMessages: boolean;
   encryptionEnabled: boolean;
@@ -30,6 +33,7 @@ interface SettingsContextType {
 const DEFAULT_SETTINGS: Settings = {
   messageRetentionMinutes: 60,
   notificationsEnabled: true,
+  notificationContent: "nameAndContent",
   theme: "dark",
   autoDeleteMessages: true,
   encryptionEnabled: true,

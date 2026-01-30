@@ -222,6 +222,20 @@ class SQMessagesRepository implements MessagesRepository, Repository {
     }
   }
 
+  async getUnreadCount(): Promise<number> {
+    const statement = await this.db.prepareAsync(
+      "SELECT COUNT(*) as count FROM messages WHERE was_read = 0",
+    );
+
+    try {
+      const result = await statement.executeAsync<{ count: number }>();
+      const row = await result.getFirstAsync();
+      return row ? row.count : 0;
+    } finally {
+      await statement.finalizeAsync();
+    }
+  }
+
   async updateDeliveryStatus(
     id: string,
     status: DeliveryStatus,

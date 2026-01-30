@@ -1,5 +1,6 @@
+import { syncBadgeWithUnreadCount } from "@/services/notification-service";
 import * as Crypto from "expo-crypto";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   FlatList,
@@ -17,6 +18,7 @@ import { ChatBubble } from "@/components/chat-bubble";
 import { DeliveryDetailsModal } from "@/components/delivery-details-modal";
 import { BackButton } from "@/components/ui/back-button";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { useActiveChat } from "@/contexts/active-chat-context";
 import { useCredential } from "@/contexts/credential-context";
 import {
   ContactsRepositoryToken,
@@ -48,7 +50,8 @@ export default function Chat() {
   const { chatId } = useLocalSearchParams<{ chatId: string }>();
   const { member } = useCredential();
   const { sendMessage } = useMessageSender();
-  const { messages, isLoading, isLoadingMore, hasMore, loadMore } =
+  const { setActiveChat } = useActiveChat();
+  const { messages, isLoadingMore, hasMore, loadMore } =
     useGroupMessages(chatId);
   const [groupName, setGroupName] = useState("Unknown Group");
   const [group, setGroup] = useState<Group | null>(null);
@@ -71,6 +74,43 @@ export default function Chat() {
     MessageDeliveryRepositoryToken,
   );
   const flatListRef = useRef<FlatList>(null);
+  const previousMessageCount = useRef(0);
+
+  // Scroll to show newest messages when new ones arrive (for inverted list, scroll to offset 0)
+  useEffect(() => {
+    const currentCount = messages.length;
+    if (
+      previousMessageCount.current > 0 &&
+      currentCount > previousMessageCount.current
+    ) {
+      // New message added - scroll to show it
+      setTimeout(() => {
+        flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+      }, 100);
+    }
+    previousMessageCount.current = currentCount;
+  }, [messages.length]);
+
+  // Track active chat for notification suppression
+  useFocusEffect(
+    useCallback(() => {
+      // Set this chat as active when screen is focused
+      setActiveChat(chatId);
+
+      // Sync badge after a short delay to account for messages being marked as read during render
+      const badgeSyncTimeout = setTimeout(() => {
+        syncBadgeWithUnreadCount().catch((error) => {
+          console.error("[Chat] Failed to sync badge:", error);
+        });
+      }, 500);
+
+      // Clear active chat when screen loses focus
+      return () => {
+        setActiveChat(null);
+        clearTimeout(badgeSyncTimeout);
+      };
+    }, [chatId, setActiveChat]),
+  );
 
   // Fetch delivery stats for messages sent by the current user
   const fetchDeliveryStats = useCallback(async () => {
@@ -113,7 +153,7 @@ export default function Chat() {
     [messageDeliveryRepo],
   );
 
-  // Process messages with date separators
+  // Process messages with date separators (reversed for inverted FlatList)
   const messagesWithSeparators: MessageItem[] = React.useMemo(() => {
     const items: MessageItem[] = [];
     const threshold = 5 * 60 * 1000; // 5 minutes threshold
@@ -186,7 +226,8 @@ export default function Chat() {
       });
     }
 
-    return items;
+    // Reverse for inverted FlatList (newest at top of data = bottom of screen)
+    return items.reverse();
   }, [messages]);
 
   useEffect(() => {
@@ -338,20 +379,14 @@ export default function Chat() {
                 ? item.data.message.id
                 : `separator-${item.timestamp}-${index}`
             }
-            onContentSizeChange={() => {
-              flatListRef.current?.scrollToEnd({ animated: true });
-            }}
-            onLayout={() => {
-              flatListRef.current?.scrollToEnd({ animated: true });
-            }}
             onEndReached={handleLoadMore}
             onEndReachedThreshold={0.5}
-            ListFooterComponent={renderFooter}
-            inverted={false}
+            ListHeaderComponent={renderFooter}
+            inverted={true}
             maintainVisibleContentPosition={{
               minIndexForVisible: 0,
             }}
-            contentContainerStyle={{ paddingRight: 5 }}
+            contentContainerStyle={{ paddingRight: 5, paddingTop: 10 }}
           />
           <View style={styles.inputContainer}>
             <TextInput

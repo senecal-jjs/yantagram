@@ -1,5 +1,5 @@
 import { ReactNode, useRef } from "react";
-import { Animated, Pressable, StyleSheet, ViewStyle } from "react-native";
+import { Animated, Pressable, ViewStyle } from "react-native";
 
 interface BounceButtonProps {
   onPress: () => void;
@@ -41,9 +41,3 @@ export const BounceButton = ({
     </Pressable>
   );
 };
-
-const styles = StyleSheet.create({
-  buttonContainer: {
-    // Add margin/padding here if needed
-  },
-});

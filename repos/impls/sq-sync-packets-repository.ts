@@ -2,8 +2,8 @@ import { BitchatPacket } from "@/types/global";
 import * as SQLite from "expo-sqlite";
 import Repository from "../specs/repository";
 import SyncPacketsRepository, {
-    SyncPacket,
-    SyncPacketCategory,
+  SyncPacket,
+  SyncPacketCategory,
 } from "../specs/sync-packets-repository";
 
 class SQSyncPacketsRepository implements SyncPacketsRepository, Repository {

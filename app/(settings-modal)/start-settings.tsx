@@ -223,6 +223,11 @@ export default function StartSettingsScreen() {
               styles.preferenceItemBottom,
               pressed && styles.itemPressed,
             ]}
+            onPress={() =>
+              router.navigate({
+                pathname: "/(settings-modal)/notifications",
+              })
+            }
           >
             <View style={styles.preferenceContent}>
               <Text style={styles.buttonText}>Notifications</Text>
@@ -247,7 +252,7 @@ export default function StartSettingsScreen() {
             router.navigate({ pathname: "/(settings-modal)/security-privacy" })
           }
         >
-          <Text style={styles.buttonText}>Security & Privacy</Text>
+          <Text style={styles.buttonText}>Features</Text>
           <IconSymbol name="chevron.right" color="white" size={15}></IconSymbol>
         </Pressable>
 

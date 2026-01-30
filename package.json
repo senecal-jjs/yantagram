@@ -35,6 +35,7 @@
     "expo-image": "~3.0.11",
     "expo-linking": "~8.0.11",
     "expo-module-scripts": "^5.0.7",
+    "expo-notifications": "~0.32.16",
     "expo-router": "~6.0.21",
     "expo-secure-store": "~15.0.8",
     "expo-sharing": "~14.0.8",

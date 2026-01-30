@@ -87,6 +87,7 @@ export default function TabTwoScreen() {
           ],
         );
       } catch (error) {
+        console.log(error);
         Alert.alert("Error", "Failed to delete messages.");
       }
     } else {

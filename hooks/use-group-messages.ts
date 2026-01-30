@@ -47,8 +47,14 @@ export const useGroupMessages = (groupId: string) => {
           setMessages(groupMessages);
           setOffset(PAGE_SIZE);
         } else {
-          // Prepend older messages to the beginning
-          setMessages((prev) => [...groupMessages, ...prev]);
+          // Prepend older messages to the beginning, deduplicating by message ID
+          setMessages((prev) => {
+            const existingIds = new Set(prev.map((m) => m.message.id));
+            const newMessages = groupMessages.filter(
+              (m) => !existingIds.has(m.message.id),
+            );
+            return [...newMessages, ...prev];
+          });
           setOffset((prev) => prev + PAGE_SIZE);
         }
       } finally {

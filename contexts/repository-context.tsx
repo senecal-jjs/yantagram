@@ -10,8 +10,9 @@ import SQOutgoingMessagesRepository from "@/repos/impls/sq-outgoing-messages-rep
 import SQRelayPacketsRepository from "@/repos/impls/sq-relay-packets-repository";
 import SQSyncPacketsRepository from "@/repos/impls/sq-sync-packets-repository";
 import Repository from "@/repos/specs/repository";
+import { registerUnreadCountCallback } from "@/services/notification-service";
 import { useSQLiteContext } from "expo-sqlite";
-import React, { createContext, useContext } from "react";
+import React, { createContext, useContext, useEffect } from "react";
 
 // Symbols to represent repository interfaces
 export const MessagesRepositoryToken = Symbol("MessagesRepository");
@@ -84,6 +85,16 @@ export const RepositoryProvider: React.FC<{ children: React.ReactNode }> = ({
 
     return repo as T;
   }
+
+  // Register the unread count callback for badge sync
+  useEffect(() => {
+    const messagesRepo = repos.get(
+      MessagesRepositoryToken,
+    ) as SQMessagesRepository;
+    if (messagesRepo) {
+      registerUnreadCountCallback(() => messagesRepo.getUnreadCount());
+    }
+  }, [repos]);
 
   const value = { repos, getRepo };
 

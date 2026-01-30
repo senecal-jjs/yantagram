@@ -1,9 +1,9 @@
 import * as SQLite from "expo-sqlite";
 import { dbListener } from "../db-listener";
 import MessageDeliveryRepository, {
-    DeliveryStats,
-    MessageDeliveryReceipt,
-    RecipientWithPseudonym,
+  DeliveryStats,
+  MessageDeliveryReceipt,
+  RecipientWithPseudonym,
 } from "../specs/message-delivery-repository";
 import Repository from "../specs/repository";
 
