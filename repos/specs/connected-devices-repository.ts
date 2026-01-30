@@ -22,8 +22,8 @@ export default interface ConnectedDevicesRepository {
     deviceUUID: string,
     isConnected: boolean,
   ): Promise<void>;
+  /** Update lastSeenAt timestamp without changing other fields */
+  touch(deviceUUID: string): Promise<void>;
   delete(deviceUUID: string): Promise<void>;
   deleteAll(): Promise<void>;
-  /** Delete devices not seen since the given timestamp */
-  deleteStale(olderThanMs: number): Promise<number>;
 }

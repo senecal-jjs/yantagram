@@ -57,30 +57,18 @@ export default function TabLayout() {
 
     syncManager.setDelegate(delegate);
     syncManager.start();
-
-    // Periodically clean up stale connected devices (not seen in 1 minute)
-    const STALE_DEVICE_THRESHOLD_MS = 1 * 60 * 1000; // 1 minute
-    const cleanupInterval = setInterval(async () => {
-      const deleted = await connectedDevicesRepo.deleteStale(
-        STALE_DEVICE_THRESHOLD_MS,
-      );
-      if (deleted > 0) {
-        console.log(`[DeviceCleanup] Removed ${deleted} stale devices`);
-      }
-    }, 60 * 1000); // Run every minute
-
-    return () => {
-      clearInterval(cleanupInterval);
-    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEventListener(BleModule, "onPeripheralReceivedWrite", (message) => {
     console.log("onPeripheralReceivedWrite: ", message.deviceUUID);
+    connectedDevicesRepo.touch(message.deviceUUID);
     handleIncomingPacket(message.rawBytes, message.deviceUUID);
   });
 
   useEventListener(BleModule, "onCentralReceivedNotification", (message) => {
     console.log("onCentralReceivedNotification: ", message.deviceUUID);
+    connectedDevicesRepo.touch(message.deviceUUID);
     handleIncomingPacket(message.rawBytes, message.deviceUUID);
   });
 
