@@ -23,7 +23,6 @@ import {
   setNotificationsEnabled,
 } from "@/services/notification-service";
 import { Buffer } from "buffer";
-import * as SQLite from "expo-sqlite";
 import { SQLiteProvider } from "expo-sqlite";
 import { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -69,7 +68,7 @@ function CredentialBackgroundTasks({
 }
 
 export default function RootLayout() {
-  SQLite.deleteDatabaseAsync("bitchat.db");
+  // SQLite.deleteDatabaseAsync("bitchat.db");
   const colorScheme = useColorScheme();
 
   return (
