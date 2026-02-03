@@ -189,7 +189,7 @@ export const CredentialProvider: React.FC<{ children: ReactNode }> = ({
 
       // Delete existing file and create new one
       const { File, Paths } = await import("expo-file-system");
-      const existingFile = new File(Paths.cache, MEMBER_STATE_FILENAME);
+      const existingFile = new File(Paths.document, MEMBER_STATE_FILENAME);
       if (existingFile.exists) {
         existingFile.delete();
       }
@@ -214,7 +214,7 @@ export const CredentialProvider: React.FC<{ children: ReactNode }> = ({
   const deleteMember = async () => {
     // Delete existing file and create new one
     const { File, Paths } = await import("expo-file-system");
-    const existingFile = new File(Paths.cache, MEMBER_STATE_FILENAME);
+    const existingFile = new File(Paths.document, MEMBER_STATE_FILENAME);
     if (existingFile.exists) {
       existingFile.delete();
       initializeMember();
