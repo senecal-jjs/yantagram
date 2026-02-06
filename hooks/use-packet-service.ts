@@ -355,7 +355,7 @@ export function usePacketService() {
       }
 
       sendAmigoPathUpdate(pathUpdate.updateMessage);
-      saveMember();
+      await saveMember();
     } catch (error) {
       console.log(error);
     }
@@ -376,7 +376,7 @@ export function usePacketService() {
           pathUpdate.nonce,
           groupName,
         );
-        saveMember();
+        await saveMember();
         pathApplied = true;
       } catch (error) {
         console.log(error);
@@ -471,7 +471,7 @@ export function usePacketService() {
           encryptedMessage.nonce,
           encryptedMessage.messageCounter,
         );
-        saveMember();
+        await saveMember();
         break; // Successfully decrypted
       } catch {
         // Try next group
