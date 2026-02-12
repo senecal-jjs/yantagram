@@ -14,10 +14,7 @@
       "infoPlist": {
         "NSBluetoothAlwaysUsageDescription": "This app uses Bluetooth to create a peripheral device",
         "NSBluetoothPeripheralUsageDescription": "This app uses Bluetooth to create a peripheral device",
-        "UIBackgroundModes": [
-          "bluetooth-central",
-          "bluetooth-peripheral"
-        ],
+        "UIBackgroundModes": ["bluetooth-central", "bluetooth-peripheral"],
         "NSCameraUsageDescription": "Yantagram uses the camera to scan QR codes to verify peers.",
         "NSPhotoLibraryUsageDescription": "Yantagram lets you pick images from your photo library to share with nearby peers.",
         "NSMicrophoneUsageDescription": "Yantagram uses the microphone to record voice notes that relay across the mesh.",
@@ -83,7 +80,8 @@
           "color": "#ffffff",
           "sounds": []
         }
-      ]
+      ],
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true,
@@ -91,13 +89,13 @@
     },
     "extra": {
       "ble": {
-        "outgoingMessageRetryIntervalSeconds": 360,
+        "outgoingMessageRetryIntervalSeconds": 60,
         "outgoingMessageRetryMaxAttempts": 10,
         "mtuLimitBytes": 512,
         "defaultFragmentSizeBytes": 469
       },
       "decryption": {
-        "pendingMessageRetentionSeconds": 86400 
+        "pendingMessageRetentionSeconds": 86400
       },
       "router": {},
       "eas": {

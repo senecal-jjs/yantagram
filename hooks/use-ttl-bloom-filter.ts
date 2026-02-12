@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 
 const BLOOM_FILE = "ttl-bloom.json";
 const SAVE_INTERVAL_MS = 30 * 1000; // Save to disk every 30 seconds
-const PRUNE_INTERVAL_MS = 60 * 1000; // Prune expired entries every 60 seconds
+const PRUNE_INTERVAL_MS = 3600 * 1000; // Prune expired entries every 60 minutes
 
 /**
  * Hook that provides a TTL bloom filter with automatic expiration of entries.

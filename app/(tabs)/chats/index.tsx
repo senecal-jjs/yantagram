@@ -126,7 +126,6 @@ export default function TabTwoScreen() {
 
   const fetchConversations = useCallback(async () => {
     const groups = await groupsRepo.list();
-    console.log("building conversations: ", Date.now());
 
     const conversationPromises = groups.map(async (group) => {
       // Get last message for this group

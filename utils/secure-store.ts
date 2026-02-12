@@ -18,4 +18,9 @@ const removeSecureStore = async (key: string) => {
   SecureStore.deleteItemAsync(key);
 };
 
-export { removeSecureStore, secureFetch, secureStore };
+const secureKeyExists = async (key: string): Promise<boolean> => {
+  const result = await SecureStore.getItemAsync(key);
+  return result !== null;
+};
+
+export { removeSecureStore, secureFetch, secureKeyExists, secureStore };
