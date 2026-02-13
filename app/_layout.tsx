@@ -12,6 +12,7 @@ import { CredentialProvider } from "@/contexts/credential-context";
 import { GroupCreationProvider } from "@/contexts/group-creation-context";
 import { RepositoryProvider } from "@/contexts/repository-context";
 import { SettingsProvider, useSettings } from "@/contexts/settings-context";
+import { useAmigoRetry } from "@/hooks/use-amigo-retry";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useMessageRetention } from "@/hooks/use-message-retention";
 import { useMessageRetry } from "@/hooks/use-message-retry";
@@ -64,6 +65,7 @@ function CredentialBackgroundTasks({
   children: React.ReactNode;
 }) {
   useMessageRetry();
+  useAmigoRetry();
   return <>{children}</>;
 }
 

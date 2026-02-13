@@ -6,6 +6,7 @@ import SQGroupsRepository from "@/repos/impls/sq-groups-repository";
 import SQIncomingPacketsRepository from "@/repos/impls/sq-incoming-packets-repository";
 import SQMessageDeliveryRepository from "@/repos/impls/sq-message-delivery-repository";
 import SQMessagesRepository from "@/repos/impls/sq-messages-repository";
+import SQOutgoingAmigoMessagesRepository from "@/repos/impls/sq-outgoing-amigo-messages-repository";
 import SQOutgoingMessagesRepository from "@/repos/impls/sq-outgoing-messages-repository";
 import SQPendingDecryptionRepository from "@/repos/impls/sq-pending-decryption-repository";
 import SQRelayPacketsRepository from "@/repos/impls/sq-relay-packets-repository";
@@ -20,6 +21,9 @@ export const MessagesRepositoryToken = Symbol("MessagesRepository");
 export const FragmentsRepositoryToken = Symbol("FragmentsRepository");
 export const OutgoingMessagesRepositoryToken = Symbol(
   "OutgoingMessagesRepository",
+);
+export const OutgoingAmigoMessagesRepositoryToken = Symbol(
+  "OutgoingAmigoMessagesRepository",
 );
 export const ContactsRepositoryToken = Symbol("ContactsRepository");
 export const GroupsRepositoryToken = Symbol("GroupsRepository");
@@ -60,6 +64,10 @@ export const RepositoryProvider: React.FC<{ children: React.ReactNode }> = ({
     repoMap.set(
       OutgoingMessagesRepositoryToken,
       new SQOutgoingMessagesRepository(db),
+    );
+    repoMap.set(
+      OutgoingAmigoMessagesRepositoryToken,
+      new SQOutgoingAmigoMessagesRepository(db),
     );
     repoMap.set(ContactsRepositoryToken, new SQContactsRepository(db));
     repoMap.set(GroupsRepositoryToken, new SQGroupsRepository(db));

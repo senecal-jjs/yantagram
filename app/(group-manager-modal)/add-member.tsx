@@ -75,7 +75,7 @@ export default function AddMemberScreen() {
       groupId,
       groupName,
     );
-    sendAmigoWelcome(welcomeMessage);
+    sendAmigoWelcome(welcomeMessage, contact.verificationKey);
   };
 
   return (

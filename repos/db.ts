@@ -15,7 +15,7 @@ async function getDB(): Promise<SQLite.SQLiteDatabase> {
 }
 
 async function migrateDb(db: SQLiteDatabase) {
-  const DATABASE_VERSION = 1;
+  const DATABASE_VERSION = 2;
 
   const result = await db.getFirstAsync<{
     user_version: number;
@@ -203,6 +203,22 @@ async function migrateDb(db: SQLiteDatabase) {
       CREATE INDEX idx_pending_decryption_messages_created_at ON pending_decryption_messages(created_at);
 `);
     currentDbVersion = 1;
+  }
+
+  if (currentDbVersion === 1) {
+    console.log("migrating to v2");
+    await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS outgoing_amigo_messages (
+        id TEXT PRIMARY KEY NOT NULL,
+        packet_type INTEGER NOT NULL,
+        payload_base64 TEXT NOT NULL,
+        recipient_verification_key TEXT,
+        retry_count INTEGER NOT NULL DEFAULT 0,
+        last_retry_at INTEGER,
+        created_at INTEGER NOT NULL DEFAULT (round(unixepoch('subsec') * 1000))
+      );
+    `);
+    currentDbVersion = 2;
   }
 
   // if (currentDbVersion === 1) {

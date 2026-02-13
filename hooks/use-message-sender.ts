@@ -10,6 +10,7 @@ import {
   GroupMembersRepositoryToken,
   MessageDeliveryRepositoryToken,
   MessagesRepositoryToken,
+  OutgoingAmigoMessagesRepositoryToken,
   OutgoingMessagesRepositoryToken,
   useRepos,
 } from "@/contexts/repository-context";
@@ -18,6 +19,7 @@ import ContactsRepository from "@/repos/specs/contacts-repository";
 import { GroupMembersRepository } from "@/repos/specs/group-members-repository";
 import MessageDeliveryRepository from "@/repos/specs/message-delivery-repository";
 import MessagesRepository from "@/repos/specs/messages-repository";
+import OutgoingAmigoMessagesRepository from "@/repos/specs/outgoing-amigo-messages-repository";
 import OutgoingMessagesRepository from "@/repos/specs/outgoing-messages-repository";
 import { fragmentPayload } from "@/services/frag-service";
 import { toBinaryPayload } from "@/services/message-protocol-service";
@@ -31,6 +33,7 @@ import {
   Message,
   PacketType,
 } from "@/types/global";
+import { quickHashHex } from "@/utils/hash";
 import { sleep } from "@/utils/sleep";
 import { uint8ArrayToHexString } from "@/utils/string";
 import Constants from "expo-constants";
@@ -40,6 +43,9 @@ export function useMessageSender() {
   const { getRepo } = useRepos();
   const outgoingMessagesRepo = getRepo<OutgoingMessagesRepository>(
     OutgoingMessagesRepositoryToken,
+  );
+  const outgoingAmigoMessagesRepo = getRepo<OutgoingAmigoMessagesRepository>(
+    OutgoingAmigoMessagesRepositoryToken,
   );
   const messagesRepo = getRepo<MessagesRepository>(MessagesRepositoryToken);
   const groupMembersRepo = getRepo<GroupMembersRepository>(
@@ -116,10 +122,27 @@ export function useMessageSender() {
     }
   };
 
-  // TODO: save amigo messages to their own repository
-  const sendAmigoWelcome = async (message: WelcomeMessage) => {
+  const sendAmigoWelcome = async (
+    message: WelcomeMessage,
+    recipientVerificationKey?: Uint8Array,
+  ) => {
     console.log("Sending Amigo Welcome");
     const messageBytes = serializeWelcomeMessage(message);
+    const messageId = quickHashHex(messageBytes);
+    const recipientHex = recipientVerificationKey
+      ? uint8ArrayToHexString(recipientVerificationKey)
+      : null;
+
+    const exists = await outgoingAmigoMessagesRepo.exists(messageId);
+    if (!exists) {
+      await outgoingAmigoMessagesRepo.create({
+        id: messageId,
+        packetType: PacketType.AMIGO_WELCOME,
+        payloadBase64: Buffer.from(messageBytes).toString("base64"),
+        recipientVerificationKey: recipientHex,
+      });
+    }
+
     buildPacketsAndSend(
       messageBytes,
       FragmentType.AMIGO_WELCOME,
@@ -130,6 +153,18 @@ export function useMessageSender() {
   const sendAmigoPathUpdate = async (message: UpdateMessage) => {
     console.log("Sending Amigo Path Update");
     const messageBytes = serializeUpdateMessage(message);
+    const messageId = quickHashHex(messageBytes);
+
+    const exists = await outgoingAmigoMessagesRepo.exists(messageId);
+    if (!exists) {
+      await outgoingAmigoMessagesRepo.create({
+        id: messageId,
+        packetType: PacketType.AMIGO_PATH_UPDATE,
+        payloadBase64: Buffer.from(messageBytes).toString("base64"),
+        recipientVerificationKey: null,
+      });
+    }
+
     buildPacketsAndSend(
       messageBytes,
       FragmentType.AMIGO_PATH_UPDATE,
@@ -198,6 +233,7 @@ export function useMessageSender() {
     sendAmigoWelcome,
     sendAmigoPathUpdate,
     sendDeliveryAck,
+    sendAmigoAck,
   };
 
   /**
@@ -237,6 +273,45 @@ export function useMessageSender() {
       await BleModule.broadcastPacketAsync(encoded, []);
     } catch (error) {
       console.error("[DeliveryAck] Failed to broadcast:", error);
+    }
+  }
+
+  /**
+   * Broadcast an acknowledgement for a received amigo message.
+   */
+  async function sendAmigoAck(messageId: string): Promise<void> {
+    if (!member) {
+      throw new Error("Member state missing for sending amigo ACK");
+    }
+
+    const myVerificationKey = uint8ArrayToHexString(
+      member.credential.verificationKey,
+    );
+
+    const ackPayload = serializeDeliveryAck({
+      messageId,
+      senderVerificationKey: myVerificationKey,
+      timestamp: Date.now(),
+    });
+
+    const packet: BitchatPacket = {
+      version: 1,
+      type: PacketType.AMIGO_ACK,
+      timestamp: Date.now(),
+      payload: ackPayload,
+      allowedHops: 3,
+    };
+
+    const encoded = encode(packet);
+
+    if (!encoded) {
+      throw new Error("Failed to encode amigo ACK packet");
+    }
+
+    try {
+      await BleModule.broadcastPacketAsync(encoded, []);
+    } catch (error) {
+      console.error("[AmigoAck] Failed to broadcast:", error);
     }
   }
 }

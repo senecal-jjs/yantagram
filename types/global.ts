@@ -24,6 +24,7 @@ enum PacketType {
   FILE_TRANSFER, // Binary file/audio/image payloads
 
   DELIVERY_ACK, // acknowledge delivery of a message to intended recipient
+  AMIGO_ACK, // acknowledge delivery of an amigo message
   READ_RECEIPT,
 }
 

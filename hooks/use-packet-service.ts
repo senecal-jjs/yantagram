@@ -14,6 +14,7 @@ import {
   IncomingPacketsRepositoryToken,
   MessageDeliveryRepositoryToken,
   MessagesRepositoryToken,
+  OutgoingAmigoMessagesRepositoryToken,
   OutgoingMessagesRepositoryToken,
   PendingDecryptionRepositoryToken,
   RelayPacketsRepositoryToken,
@@ -29,6 +30,7 @@ import GroupsRepository from "@/repos/specs/groups-repository";
 import IncomingPacketsRepository from "@/repos/specs/incoming-packets-repository";
 import MessageDeliveryRepository from "@/repos/specs/message-delivery-repository";
 import MessagesRepository from "@/repos/specs/messages-repository";
+import OutgoingAmigoMessagesRepository from "@/repos/specs/outgoing-amigo-messages-repository";
 import OutgoingMessagesRepository from "@/repos/specs/outgoing-messages-repository";
 import PendingDecryptionRepository from "@/repos/specs/pending-decryption-repository";
 import RelayPacketsRepository from "@/repos/specs/relay-packets-repository";
@@ -60,6 +62,7 @@ import {
   FragmentType,
   PacketType,
 } from "@/types/global";
+import { quickHashHex } from "@/utils/hash";
 import { Mutex } from "@/utils/mutex";
 import { uint8ArrayToHexString } from "@/utils/string";
 import Constants from "expo-constants";
@@ -100,11 +103,16 @@ export function usePacketService() {
   const outgoingMessagesRepository = getRepo<OutgoingMessagesRepository>(
     OutgoingMessagesRepositoryToken,
   );
+  const outgoingAmigoMessagesRepository =
+    getRepo<OutgoingAmigoMessagesRepository>(
+      OutgoingAmigoMessagesRepositoryToken,
+    );
   const pendingDecryptionRepository = getRepo<PendingDecryptionRepository>(
     PendingDecryptionRepositoryToken,
   );
   const { member, saveMember } = useCredentials();
-  const { sendAmigoPathUpdate, sendDeliveryAck } = useMessageSender();
+  const { sendAmigoPathUpdate, sendDeliveryAck, sendAmigoAck } =
+    useMessageSender();
   const syncManager = getGossipSyncManager();
 
   // Get pending message retention from config (default 1 hour)
@@ -240,6 +248,10 @@ export function usePacketService() {
         await handleDeliveryAck(packet.payload);
         break;
 
+      case PacketType.AMIGO_ACK:
+        await handleAmigoAck(packet.payload);
+        break;
+
       case PacketType.SYNC_REQUEST:
         syncManager.handleSyncRequest(deviceUUID, packet);
         break;
@@ -307,6 +319,8 @@ export function usePacketService() {
 
     const welcome = deserializeWelcomeMessage(welcomeBytes);
 
+    const messageId = quickHashHex(welcomeBytes);
+
     try {
       // Attempt decryption of the welcome message, if successful
       // the message has reached its intended recipient.
@@ -356,6 +370,7 @@ export function usePacketService() {
 
       sendAmigoPathUpdate(pathUpdate.updateMessage);
       await saveMember();
+      await sendAmigoAck(messageId);
     } catch (error) {
       console.log(error);
     }
@@ -368,6 +383,7 @@ export function usePacketService() {
 
     const pathUpdate = deserializeUpdateMessage(pathUpdateBytes);
     let pathApplied = false;
+    const messageId = quickHashHex(pathUpdateBytes);
 
     for (const groupName of member.getGroupNames()) {
       try {
@@ -386,6 +402,7 @@ export function usePacketService() {
     // After applying a path update, retry decryption of pending messages
     if (pathApplied) {
       await retryPendingDecryption();
+      await sendAmigoAck(messageId);
     }
   };
 
@@ -670,6 +687,40 @@ export function usePacketService() {
       }
     } catch (error) {
       console.error("Failed to handle delivery ACK:", error);
+    }
+  };
+
+  /**
+   * Handle amigo acknowledgement packets.
+   * Removes the amigo message from the outgoing queue when acknowledged.
+   */
+  const handleAmigoAck = async (ackBytes: Uint8Array) => {
+    try {
+      const ack = deserializeDeliveryAck(ackBytes);
+
+      if (!ack) {
+        console.warn("Failed to deserialize amigo ACK");
+        return;
+      }
+
+      const outgoing = await outgoingAmigoMessagesRepository.getById(
+        ack.messageId,
+      );
+
+      if (!outgoing) {
+        return;
+      }
+
+      if (
+        outgoing.recipientVerificationKey &&
+        outgoing.recipientVerificationKey !== ack.senderVerificationKey
+      ) {
+        return;
+      }
+
+      await outgoingAmigoMessagesRepository.delete(ack.messageId);
+    } catch (error) {
+      console.error("Failed to handle amigo ACK:", error);
     }
   };
 

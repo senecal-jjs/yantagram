@@ -118,7 +118,7 @@ export default function StartMessageScreen() {
       member?.pseudonym,
     );
 
-    sendAmigoWelcome(welcomeMessage);
+    sendAmigoWelcome(welcomeMessage, contact.verificationKey);
   };
 
   const handleNewGroupPress = () => {
