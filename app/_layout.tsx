@@ -14,6 +14,7 @@ import { RepositoryProvider } from "@/contexts/repository-context";
 import { SettingsProvider, useSettings } from "@/contexts/settings-context";
 import { useAmigoRetry } from "@/hooks/use-amigo-retry";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useDeliveryAckRetry } from "@/hooks/use-delivery-ack-retry";
 import { useMessageRetention } from "@/hooks/use-message-retention";
 import { useMessageRetry } from "@/hooks/use-message-retry";
 import { useNotifications } from "@/hooks/use-notifications";
@@ -66,6 +67,7 @@ function CredentialBackgroundTasks({
 }) {
   useMessageRetry();
   useAmigoRetry();
+  useDeliveryAckRetry();
   return <>{children}</>;
 }
 

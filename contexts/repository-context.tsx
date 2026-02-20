@@ -9,6 +9,7 @@ import SQMessagesRepository from "@/repos/impls/sq-messages-repository";
 import SQOutgoingAmigoMessagesRepository from "@/repos/impls/sq-outgoing-amigo-messages-repository";
 import SQOutgoingMessagesRepository from "@/repos/impls/sq-outgoing-messages-repository";
 import SQPendingDecryptionRepository from "@/repos/impls/sq-pending-decryption-repository";
+import SQPendingDeliveryAcksRepository from "@/repos/impls/sq-pending-delivery-acks-repository";
 import SQRelayPacketsRepository from "@/repos/impls/sq-relay-packets-repository";
 import SQSyncPacketsRepository from "@/repos/impls/sq-sync-packets-repository";
 import Repository from "@/repos/specs/repository";
@@ -41,6 +42,9 @@ export const MessageDeliveryRepositoryToken = Symbol(
 );
 export const PendingDecryptionRepositoryToken = Symbol(
   "PendingDecryptionRepository",
+);
+export const PendingDeliveryAcksRepositoryToken = Symbol(
+  "PendingDeliveryAcksRepository",
 );
 
 interface RepositoryContextType {
@@ -89,6 +93,10 @@ export const RepositoryProvider: React.FC<{ children: React.ReactNode }> = ({
     repoMap.set(
       PendingDecryptionRepositoryToken,
       new SQPendingDecryptionRepository(db),
+    );
+    repoMap.set(
+      PendingDeliveryAcksRepositoryToken,
+      new SQPendingDeliveryAcksRepository(db),
     );
     return repoMap;
   }, [db]);

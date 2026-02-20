@@ -7,6 +7,7 @@ import {
   ContactsRepositoryToken,
   GroupsRepositoryToken,
   MessagesRepositoryToken,
+  OutgoingMessagesRepositoryToken,
   RelayPacketsRepositoryToken,
   useRepos,
 } from "@/contexts/repository-context";
@@ -15,6 +16,7 @@ import { dbListener } from "@/repos/db-listener";
 import ContactsRepository from "@/repos/specs/contacts-repository";
 import GroupsRepository from "@/repos/specs/groups-repository";
 import MessagesRepository from "@/repos/specs/messages-repository";
+import OutgoingMessagesRepository from "@/repos/specs/outgoing-messages-repository";
 import RelayPacketsRepository from "@/repos/specs/relay-packets-repository";
 import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -53,6 +55,9 @@ export default function TabTwoScreen() {
   const { getRepo } = useRepos();
   const groupsRepo = getRepo<GroupsRepository>(GroupsRepositoryToken);
   const messagesRepo = getRepo<MessagesRepository>(MessagesRepositoryToken);
+  const outgoingMessagesRepo = getRepo<OutgoingMessagesRepository>(
+    OutgoingMessagesRepositoryToken,
+  );
   const contactsRepo = getRepo<ContactsRepository>(ContactsRepositoryToken);
   const relayPacketsRepo = getRepo<RelayPacketsRepository>(
     RelayPacketsRepositoryToken,
@@ -231,6 +236,7 @@ export default function TabTwoScreen() {
         await saveMember();
       }
       // Delete the group from database (cascade will remove group_members)
+      await outgoingMessagesRepo.deleteByGroupId(chatId);
       await groupsRepo.delete(chatId);
       // Refresh the conversations list
       fetchConversations();

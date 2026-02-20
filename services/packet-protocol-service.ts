@@ -232,6 +232,15 @@ export interface DeliveryAck {
 }
 
 /**
+ * DeliveryAckConfirm payload structure for confirming receipt of a delivery ACK
+ */
+export interface DeliveryAckConfirm {
+  messageId: string;
+  recipientVerificationKey: string; // hex string of who sent the original ACK
+  timestamp: number;
+}
+
+/**
  * Serialize a DeliveryAck to binary format
  * Format:
  * - 1 byte: message ID length (uint8)
@@ -266,6 +275,48 @@ export const serializeDeliveryAck = (ack: DeliveryAck): Uint8Array => {
 
   // Sender verification key bytes
   data.push(...Array.from(senderKeyBytes));
+
+  // Timestamp (8 bytes, big-endian)
+  const timestamp = ack.timestamp;
+  for (let shift = 56; shift >= 0; shift -= 8) {
+    data.push((timestamp >>> shift) & 0xff);
+  }
+
+  return new Uint8Array(data);
+};
+
+/**
+ * Serialize a DeliveryAckConfirm to binary format
+ * Format matches DeliveryAck but uses recipientVerificationKey field name.
+ */
+export const serializeDeliveryAckConfirm = (
+  ack: DeliveryAckConfirm,
+): Uint8Array => {
+  const encoder = new TextEncoder();
+  const messageIdBytes = encoder.encode(ack.messageId);
+  const recipientKeyBytes = encoder.encode(ack.recipientVerificationKey);
+
+  if (messageIdBytes.length > 255) {
+    throw new Error("Message ID too long (max 255 bytes)");
+  }
+
+  if (recipientKeyBytes.length > 255) {
+    throw new Error("Recipient verification key too long (max 255 bytes)");
+  }
+
+  const data: number[] = [];
+
+  // Message ID length (1 byte)
+  data.push(messageIdBytes.length);
+
+  // Message ID bytes
+  data.push(...Array.from(messageIdBytes));
+
+  // Recipient verification key length (1 byte)
+  data.push(recipientKeyBytes.length);
+
+  // Recipient verification key bytes
+  data.push(...Array.from(recipientKeyBytes));
 
   // Timestamp (8 bytes, big-endian)
   const timestamp = ack.timestamp;
@@ -316,4 +367,47 @@ export const deserializeDeliveryAck = (
   }
 
   return { messageId, senderVerificationKey, timestamp };
+};
+
+/**
+ * Deserialize binary data to DeliveryAckConfirm
+ */
+export const deserializeDeliveryAckConfirm = (
+  data: Uint8Array,
+): DeliveryAckConfirm | null => {
+  if (data.length < 11) return null; // minimum: 1 + 0 + 1 + 0 + 8 bytes
+
+  let offset = 0;
+
+  // Read message ID length
+  const messageIdLength = data[offset++];
+
+  if (data.length < 1 + messageIdLength + 1 + 8) return null;
+
+  // Read message ID
+  const messageIdBytes = data.slice(offset, offset + messageIdLength);
+  offset += messageIdLength;
+
+  const decoder = new TextDecoder();
+  const messageId = decoder.decode(messageIdBytes);
+
+  // Read recipient verification key length
+  const recipientKeyLength = data[offset++];
+
+  if (data.length < 1 + messageIdLength + 1 + recipientKeyLength + 8)
+    return null;
+
+  // Read recipient verification key
+  const recipientKeyBytes = data.slice(offset, offset + recipientKeyLength);
+  offset += recipientKeyLength;
+
+  const recipientVerificationKey = decoder.decode(recipientKeyBytes);
+
+  // Read timestamp (8 bytes, big-endian)
+  let timestamp = 0;
+  for (let i = 0; i < 8; i++) {
+    timestamp = (timestamp << 8) | data[offset++];
+  }
+
+  return { messageId, recipientVerificationKey, timestamp };
 };

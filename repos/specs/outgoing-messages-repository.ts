@@ -17,6 +17,7 @@ export default interface OutgoingMessagesRepository {
   delete(messageId: string): Promise<Message | null>;
   getAll(limit?: number): Promise<OutgoingMessage[]>;
   exists(messageId: string): Promise<boolean>;
+  deleteByGroupId(groupId: string): Promise<void>;
   /**
    * Get messages that are due for retry based on the interval.
    * @param intervalMs - Minimum time (in ms) that must have passed since last retry

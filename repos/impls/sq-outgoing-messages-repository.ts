@@ -171,6 +171,18 @@ class SQOutgoingMessagesRepository
     }
   }
 
+  async deleteByGroupId(groupId: string): Promise<void> {
+    const statement = await this.db.prepareAsync(
+      "DELETE FROM outgoing_messages WHERE group_id = $groupId",
+    );
+
+    try {
+      await statement.executeAsync({ $groupId: groupId });
+    } finally {
+      await statement.finalizeAsync();
+    }
+  }
+
   /**
    * Convert database row to Message object (for backward compatibility)
    */

@@ -157,7 +157,17 @@ export function useMessageRetry() {
         `[MessageRetry] Found ${messagesToRetry.length} messages to retry`,
       );
 
+      const memberGroupNames = new Set(member.getGroupNames());
+
       for (const message of messagesToRetry) {
+        if (!memberGroupNames.has(message.groupId)) {
+          await outgoingMessagesRepo.delete(message.id);
+          console.log(
+            `[MessageRetry] Skipping retry for message ${message.id} (group ${message.groupId} no longer exists)`,
+          );
+          continue;
+        }
+
         try {
           await retryMessage(message);
           await outgoingMessagesRepo.updateRetryInfo(message.id);

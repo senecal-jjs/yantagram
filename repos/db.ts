@@ -15,7 +15,7 @@ async function getDB(): Promise<SQLite.SQLiteDatabase> {
 }
 
 async function migrateDb(db: SQLiteDatabase) {
-  const DATABASE_VERSION = 2;
+  const DATABASE_VERSION = 3;
 
   const result = await db.getFirstAsync<{
     user_version: number;
@@ -219,6 +219,26 @@ async function migrateDb(db: SQLiteDatabase) {
       );
     `);
     currentDbVersion = 2;
+  }
+
+  if (currentDbVersion === 2) {
+    console.log("migrating to v3");
+    await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS pending_delivery_acks (
+        message_id TEXT PRIMARY KEY NOT NULL,
+        recipient_verification_key TEXT NOT NULL,
+        first_sent_at INTEGER NOT NULL,
+        last_sent_at INTEGER,
+        retry_count INTEGER NOT NULL DEFAULT 0,
+        created_at INTEGER NOT NULL DEFAULT (round(unixepoch('subsec') * 1000))
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_pending_delivery_acks_last_sent_at
+        ON pending_delivery_acks(last_sent_at);
+      CREATE INDEX IF NOT EXISTS idx_pending_delivery_acks_first_sent_at
+        ON pending_delivery_acks(first_sent_at);
+    `);
+    currentDbVersion = 3;
   }
 
   // if (currentDbVersion === 1) {

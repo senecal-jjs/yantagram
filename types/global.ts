@@ -26,6 +26,7 @@ enum PacketType {
   DELIVERY_ACK, // acknowledge delivery of a message to intended recipient
   AMIGO_ACK, // acknowledge delivery of an amigo message
   READ_RECEIPT,
+  DELIVERY_ACK_CONFIRM, // confirm receipt of delivery ACK
 }
 
 enum FragmentType {

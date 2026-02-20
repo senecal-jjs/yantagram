@@ -17,6 +17,7 @@ import {
   OutgoingAmigoMessagesRepositoryToken,
   OutgoingMessagesRepositoryToken,
   PendingDecryptionRepositoryToken,
+  PendingDeliveryAcksRepositoryToken,
   RelayPacketsRepositoryToken,
   SyncPacketsRepositoryToken,
   useRepos,
@@ -33,6 +34,7 @@ import MessagesRepository from "@/repos/specs/messages-repository";
 import OutgoingAmigoMessagesRepository from "@/repos/specs/outgoing-amigo-messages-repository";
 import OutgoingMessagesRepository from "@/repos/specs/outgoing-messages-repository";
 import PendingDecryptionRepository from "@/repos/specs/pending-decryption-repository";
+import PendingDeliveryAcksRepository from "@/repos/specs/pending-delivery-acks-repository";
 import RelayPacketsRepository from "@/repos/specs/relay-packets-repository";
 import SyncPacketsRepository from "@/repos/specs/sync-packets-repository";
 import {
@@ -55,6 +57,7 @@ import * as PacketProtocolService from "@/services/packet-protocol-service";
 import {
   decode,
   deserializeDeliveryAck,
+  deserializeDeliveryAckConfirm,
 } from "@/services/packet-protocol-service";
 import {
   BitchatPacket,
@@ -110,9 +113,16 @@ export function usePacketService() {
   const pendingDecryptionRepository = getRepo<PendingDecryptionRepository>(
     PendingDecryptionRepositoryToken,
   );
+  const pendingDeliveryAcksRepository = getRepo<PendingDeliveryAcksRepository>(
+    PendingDeliveryAcksRepositoryToken,
+  );
   const { member, saveMember } = useCredentials();
-  const { sendAmigoPathUpdate, sendDeliveryAck, sendAmigoAck } =
-    useMessageSender();
+  const {
+    sendAmigoPathUpdate,
+    sendDeliveryAck,
+    sendDeliveryAckConfirm,
+    sendAmigoAck,
+  } = useMessageSender();
   const syncManager = getGossipSyncManager();
 
   // Get pending message retention from config (default 1 hour)
@@ -248,6 +258,10 @@ export function usePacketService() {
         await handleDeliveryAck(packet.payload);
         break;
 
+      case PacketType.DELIVERY_ACK_CONFIRM:
+        await handleDeliveryAckConfirm(packet.payload);
+        break;
+
       case PacketType.AMIGO_ACK:
         await handleAmigoAck(packet.payload);
         break;
@@ -329,14 +343,58 @@ export function usePacketService() {
 
       const groupName = await member.getGroupPseudonym(welcome);
 
+      const existingGroup = await groupsRepository.get(
+        pathUpdate.treeInfo.groupName,
+      );
+
+      if (pathUpdate.treeInfo.expandable === false) {
+        const myVerificationKeyBase64 = Buffer.from(
+          member.credential.verificationKey,
+        ).toString("base64");
+
+        for (const credential of pathUpdate.treeInfo.credentials) {
+          if (credential[1].verificationKey === myVerificationKeyBase64) {
+            continue;
+          }
+
+          const verificationKeyBytes = Buffer.from(
+            credential[1].verificationKey,
+            "base64",
+          );
+          const contact =
+            await contactsRepository.getByVerificationKey(verificationKeyBytes);
+
+          if (!contact) {
+            continue;
+          }
+
+          const existingSingleContactGroupId =
+            await groupsRepository.getSingleContactGroup(contact.id);
+
+          if (
+            existingSingleContactGroupId &&
+            existingSingleContactGroupId !== pathUpdate.treeInfo.groupName
+          ) {
+            member.removeGroup(pathUpdate.treeInfo.groupName);
+            await saveMember();
+            await sendAmigoAck(messageId);
+            return;
+          }
+
+          break;
+        }
+      }
+
       // group name off of tree info is an immutable unique uuid identifier for the group
       // the local group name variable can be changed at will by the user to identify the group on their device
-      const group = await groupsRepository.create(
-        pathUpdate.treeInfo.groupName,
-        groupName,
-        false,
-        pathUpdate.treeInfo.expandable ?? true,
-      );
+      const group =
+        existingGroup ??
+        (await groupsRepository.create(
+          pathUpdate.treeInfo.groupName,
+          groupName,
+          false,
+          pathUpdate.treeInfo.expandable ?? true,
+        ));
 
       for (const credential of pathUpdate.treeInfo.credentials) {
         const verificationKeyBytes = Buffer.from(
@@ -348,7 +406,13 @@ export function usePacketService() {
           await contactsRepository.getByVerificationKey(verificationKeyBytes);
 
         if (contact) {
-          groupMembersRepository.add(group.id, contact.id);
+          const isMember = await groupMembersRepository.isMember(
+            group.id,
+            contact.id,
+          );
+          if (!isMember) {
+            groupMembersRepository.add(group.id, contact.id);
+          }
         } else {
           // create a new unknown contact (verified out of band == false)
           const newContact = await contactsRepository.create(
@@ -684,9 +748,45 @@ export function usePacketService() {
         console.log(
           `[DeliveryAck] Message ${ack.messageId} - ${stats.delivered}/${stats.total} delivered`,
         );
+
+        if (member) {
+          await sendDeliveryAckConfirm(
+            ack.messageId,
+            ack.senderVerificationKey,
+          );
+        }
       }
     } catch (error) {
       console.error("Failed to handle delivery ACK:", error);
+    }
+  };
+
+  /**
+   * Handle delivery ACK confirmation packets.
+   * Stops retrying delivery ACKs once the sender confirms receipt.
+   */
+  const handleDeliveryAckConfirm = async (ackBytes: Uint8Array) => {
+    if (!member) return;
+
+    try {
+      const ackConfirm = deserializeDeliveryAckConfirm(ackBytes);
+
+      if (!ackConfirm) {
+        console.warn("Failed to deserialize delivery ACK confirm");
+        return;
+      }
+
+      const myVerificationKey = uint8ArrayToHexString(
+        member.credential.verificationKey,
+      );
+
+      if (ackConfirm.recipientVerificationKey !== myVerificationKey) {
+        return;
+      }
+
+      await pendingDeliveryAcksRepository.delete(ackConfirm.messageId);
+    } catch (error) {
+      console.error("Failed to handle delivery ACK confirm:", error);
     }
   };
 

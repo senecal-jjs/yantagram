@@ -12,6 +12,7 @@ import {
   MessagesRepositoryToken,
   OutgoingAmigoMessagesRepositoryToken,
   OutgoingMessagesRepositoryToken,
+  PendingDeliveryAcksRepositoryToken,
   useRepos,
 } from "@/contexts/repository-context";
 import BleModule from "@/modules/ble/src/BleModule";
@@ -21,11 +22,13 @@ import MessageDeliveryRepository from "@/repos/specs/message-delivery-repository
 import MessagesRepository from "@/repos/specs/messages-repository";
 import OutgoingAmigoMessagesRepository from "@/repos/specs/outgoing-amigo-messages-repository";
 import OutgoingMessagesRepository from "@/repos/specs/outgoing-messages-repository";
+import PendingDeliveryAcksRepository from "@/repos/specs/pending-delivery-acks-repository";
 import { fragmentPayload } from "@/services/frag-service";
 import { toBinaryPayload } from "@/services/message-protocol-service";
 import {
   encode,
   serializeDeliveryAck,
+  serializeDeliveryAckConfirm,
 } from "@/services/packet-protocol-service";
 import {
   BitchatPacket,
@@ -54,6 +57,9 @@ export function useMessageSender() {
   const contactsRepo = getRepo<ContactsRepository>(ContactsRepositoryToken);
   const messageDeliveryRepo = getRepo<MessageDeliveryRepository>(
     MessageDeliveryRepositoryToken,
+  );
+  const pendingDeliveryAcksRepo = getRepo<PendingDeliveryAcksRepository>(
+    PendingDeliveryAcksRepositoryToken,
   );
 
   const sendMessage = async (message: Message) => {
@@ -233,6 +239,7 @@ export function useMessageSender() {
     sendAmigoWelcome,
     sendAmigoPathUpdate,
     sendDeliveryAck,
+    sendDeliveryAckConfirm,
     sendAmigoAck,
   };
 
@@ -249,10 +256,22 @@ export function useMessageSender() {
       member.credential.verificationKey,
     );
 
+    const sentAt = Date.now();
+
+    try {
+      await pendingDeliveryAcksRepo.recordSent(
+        messageId,
+        myVerificationKey,
+        sentAt,
+      );
+    } catch (error) {
+      console.error("[DeliveryAck] Failed to record pending ACK:", error);
+    }
+
     const ackPayload = serializeDeliveryAck({
       messageId,
       senderVerificationKey: myVerificationKey,
-      timestamp: Date.now(),
+      timestamp: sentAt,
     });
 
     const packet: BitchatPacket = {
@@ -273,6 +292,40 @@ export function useMessageSender() {
       await BleModule.broadcastPacketAsync(encoded, []);
     } catch (error) {
       console.error("[DeliveryAck] Failed to broadcast:", error);
+    }
+  }
+
+  /**
+   * Broadcast a delivery ACK confirmation for a received delivery ACK.
+   */
+  async function sendDeliveryAckConfirm(
+    messageId: string,
+    recipientVerificationKey: string,
+  ): Promise<void> {
+    const ackConfirmPayload = serializeDeliveryAckConfirm({
+      messageId,
+      recipientVerificationKey,
+      timestamp: Date.now(),
+    });
+
+    const packet: BitchatPacket = {
+      version: 1,
+      type: PacketType.DELIVERY_ACK_CONFIRM,
+      timestamp: Date.now(),
+      payload: ackConfirmPayload,
+      allowedHops: 3,
+    };
+
+    const encoded = encode(packet);
+
+    if (!encoded) {
+      throw new Error("Failed to encode delivery ACK confirm packet");
+    }
+
+    try {
+      await BleModule.broadcastPacketAsync(encoded, []);
+    } catch (error) {
+      console.error("[DeliveryAckConfirm] Failed to broadcast:", error);
     }
   }
 
